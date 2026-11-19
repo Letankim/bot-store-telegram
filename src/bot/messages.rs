@@ -28,7 +28,7 @@ pub fn welcome_message(
 
     format!(
         "👋 Xin chào <b>{}</b>!\n\n\
-         🤖 Chào mừng bạn đến với hệ thống <b>Kích Hoạt Gemini Pro Chính Chủ (Your Mail)</b> tự động.\n\n\
+         🤖 Chào mừng bạn đến với hệ thống <b>kích hoạt Gemini Pro chính chủ (Your Mail)</b> tự động.\n\n\
          💰 Số dư ví hiện tại: <b>{} đ</b>\n\
          🎁 <b>Chương trình mời bạn bè:</b>\n\
          <code>{}</code>\n\

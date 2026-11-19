@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Kích Hoạt Gemini Pro — Form Thông Tin</title>
+  <title>Kích hoạt Gemini Pro — Form thông tin</title>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -337,7 +337,7 @@
         <div class="guide-icon"><i class="bx bx-book-open"></i></div>
         <div>
           <strong>Chưa biết đóng HSTT &amp; lấy mã 2FA?</strong>
-          <span>Xem Hướng Dẫn 6 bước chi tiết + công cụ lấy OTP 6 số</span>
+          <span>Xem hướng dẫn 6 bước chi tiết + công cụ lấy OTP 6 số</span>
         </div>
       </div>
       <i class="bx bx-chevron-right" style="font-size:1.45rem;color:#2563eb;"></i>
@@ -414,16 +414,16 @@
       <div class="checklist-box">
         <label class="check-item">
           <input id="chkWhite" type="checkbox" required />
-          <span>Tôi xác nhận Gmail là <strong>tài khoản trắng</strong>, chưa dùng Google One / Gemini Pro và <strong>không ở trong Google Family</strong>.</span>
+          <span>Tôi xác nhận Gmail là <strong>tài khoản trắng</strong>, chưa dùng Google One / Gemini Pro và <strong>không ở trong nhóm Google Family</strong>.</span>
         </label>
         <label class="check-item">
           <input id="chkHstt" type="checkbox" required />
-          <span>Tôi đã <strong>đóng sạch Hồ sơ thanh toán (HSTT)</strong> cũ và bật 2FA (Authenticator 32 ký tự) đúng theo Trang Hướng Dẫn.</span>
+          <span>Tôi đã <strong>đóng sạch hồ sơ thanh toán (HSTT)</strong> cũ và bật 2FA (Authenticator 32 ký tự) đúng theo hướng dẫn.</span>
         </label>
       </div>
 
       <button id="submitBtn" class="btn-submit" type="submit" disabled>
-        <i class="bx bx-rocket"></i> <span>Xác nhận Thanh toán &amp; Gửi Đơn Kích Hoạt</span>
+        <i class="bx bx-rocket"></i> <span>Xác nhận thanh toán &amp; gửi đơn kích hoạt</span>
       </button>
     </form>
   </div>
@@ -591,7 +591,7 @@
           statusEl.className = "status-chip ok";
           statusEl.innerHTML = '<i class="bx bx-check-circle"></i> Đủ số dư';
           submitBtn.disabled = false;
-          submitBtn.innerHTML = `<i class="bx bx-rocket"></i> <span>Thanh toán ${formatVnd(d.plan.price_vnd)} &amp; Gửi Đơn</span>`;
+          submitBtn.innerHTML = `<i class="bx bx-rocket"></i> <span>Thanh toán ${formatVnd(d.plan.price_vnd)} &amp; gửi đơn</span>`;
         } else {
           statusEl.className = "status-chip warn";
           statusEl.innerHTML = '<i class="bx bx-error"></i> Thiếu tiền';
@@ -626,7 +626,7 @@
         if (!json.success) {
           showAlert(json.message + (json.error?.details ? ` (${json.error.details})` : ""), "error");
           submitBtn.disabled = false;
-          submitBtn.innerHTML = '<i class="bx bx-rocket"></i> <span>Xác nhận Thanh toán &amp; Gửi Đơn</span>';
+          submitBtn.innerHTML = '<i class="bx bx-rocket"></i> <span>Xác nhận thanh toán &amp; gửi đơn</span>';
           return;
         }
         showAlert(`Tạo đơn thành công! Mã đơn: ${json.data.order_code}. Đơn sẽ được xử lý trong 1–6h.`, "success");

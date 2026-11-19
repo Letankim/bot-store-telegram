@@ -138,7 +138,7 @@ pub async fn submit_activation(
 
     // Notify Customer via Telegram
     let customer_msg = format!(
-        "✅ <b>Đặt Đơn Kích Hoạt Gemini Pro Thành Công!</b>\n\n\
+        "✅ <b>Đặt đơn kích hoạt Gemini Pro thành công!</b>\n\n\
          • Mã đơn: <code>{}</code>\n\
          • Gói: <b>{}</b>\n\
          • Gmail: <code>{}</code>\n\

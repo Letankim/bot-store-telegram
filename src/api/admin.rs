@@ -261,7 +261,7 @@ pub async fn complete_order(
             .unwrap_or_default();
 
         let msg = format!(
-            "🎉 <b>Đơn Kích Hoạt Gemini Pro Đã Hoàn Tất!</b>\n\n\
+            "🎉 <b>Đơn kích hoạt Gemini Pro đã hoàn tất!</b>\n\n\
              • Mã đơn: <code>{}</code>\n\
              • Gmail: <code>{}</code>{}\n\n\
              ✅ Bạn đã có thể đăng nhập Gemini Pro và sử dụng ngay. Cảm ơn bạn đã ủng hộ!",
@@ -311,12 +311,12 @@ pub async fn refund_order(
     if let Some(tg_id) = outcome.user_telegram_id {
         let new_bal = outcome.refunded_balance_vnd.unwrap_or(0);
         let msg = format!(
-            "↩️ <b>Hoàn Tiền 100% Đơn Hàng Lỗi!</b>\n\n\
+            "↩️ <b>Hoàn tiền 100% đơn hàng lỗi!</b>\n\n\
              • Mã đơn: <code>{}</code>\n\
              • Số tiền hoàn lại ví: <b>+{} đ</b>\n\
              • Số dư ví hiện tại: <b>{} đ</b>\n\
              • Lý do: <i>{}</i>\n\n\
-             📘 Vui lòng kiểm tra lại Trang Hướng Dẫn (/guide) trước khi đặt lại đơn mới nhé!",
+             📘 Vui lòng kiểm tra lại hướng dẫn (/guide) trước khi đặt lại đơn mới nhé!",
             outcome.order.order_code,
             format_vnd(outcome.order.price_paid_vnd),
             format_vnd(new_bal),

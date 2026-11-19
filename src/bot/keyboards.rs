@@ -6,10 +6,10 @@ use url::Url;
 use crate::domain::{gemini_plan::GeminiPlan, wallet::format_vnd};
 
 pub const BTN_GEMINI_PRO: &str = "🤖 Kích hoạt Gemini Pro";
-pub const BTN_WALLET: &str = "💰 Ví & Nạp tiền";
+pub const BTN_WALLET: &str = "💰 Ví & nạp tiền";
 pub const BTN_ORDERS: &str = "📦 Đơn hàng của tôi";
 pub const BTN_GUIDE: &str = "📘 Hướng dẫn 2FA & HSTT";
-pub const BTN_REFERRAL: &str = "🎁 Mời bạn bè & Thưởng";
+pub const BTN_REFERRAL: &str = "🎁 Mời bạn bè & thưởng";
 
 /// Persistent Reply Keyboard at bottom of Telegram chat.
 pub fn main_reply_keyboard() -> KeyboardMarkup {
@@ -40,7 +40,7 @@ pub fn plan_selector_keyboard(plans: &[GeminiPlan]) -> InlineKeyboardMarkup {
         })
         .collect();
     rows.push(vec![InlineKeyboardButton::callback(
-        "⬅️ Quay lại Menu chính",
+        "⬅️ Quay lại menu chính",
         "back:home",
     )]);
     InlineKeyboardMarkup::new(rows)
@@ -49,19 +49,19 @@ pub fn plan_selector_keyboard(plans: &[GeminiPlan]) -> InlineKeyboardMarkup {
 /// Inline keyboard attached under the Gemini Pro detail card.
 pub fn plan_detail_keyboard(plan_id: &str, guide_url: &str) -> InlineKeyboardMarkup {
     let mut rows = vec![vec![InlineKeyboardButton::callback(
-        "🚀 Kiểm tra số dư & Kích hoạt ngay",
+        "🚀 Kiểm tra số dư & kích hoạt ngay",
         format!("chk_act:{plan_id}"),
     )]];
 
     if let Ok(parsed) = Url::parse(guide_url) {
         if parsed.scheme() == "https" {
             rows.push(vec![InlineKeyboardButton::web_app(
-                "📘 Xem Hướng dẫn Đóng HSTT & Lấy 2FA",
+                "📘 Xem hướng dẫn đóng HSTT & lấy 2FA",
                 WebAppInfo { url: parsed },
             )]);
         } else {
             rows.push(vec![InlineKeyboardButton::url(
-                "📘 Xem Hướng dẫn Đóng HSTT & Lấy 2FA",
+                "📘 Xem hướng dẫn đóng HSTT & lấy 2FA",
                 parsed,
             )]);
         }
@@ -84,12 +84,12 @@ pub fn open_activate_webapp_keyboard(
     if let Ok(url) = Url::parse(activate_url) {
         if url.scheme() == "https" {
             rows.push(vec![InlineKeyboardButton::web_app(
-                "📝 Mở Form Điền Mail | Pass | 2FA",
+                "📝 Mở form điền Mail | Pass | 2FA",
                 WebAppInfo { url },
             )]);
         } else {
             rows.push(vec![InlineKeyboardButton::url(
-                "📝 Mở Form Điền Mail | Pass | 2FA",
+                "📝 Mở form điền Mail | Pass | 2FA",
                 url,
             )]);
         }
@@ -97,12 +97,12 @@ pub fn open_activate_webapp_keyboard(
     if let Ok(url) = Url::parse(guide_url) {
         if url.scheme() == "https" {
             rows.push(vec![InlineKeyboardButton::web_app(
-                "📘 Xem Hướng Dẫn 6 Bước (Đóng HSTT & 2FA)",
+                "📘 Xem hướng dẫn 6 bước (đóng HSTT & 2FA)",
                 WebAppInfo { url },
             )]);
         } else {
             rows.push(vec![InlineKeyboardButton::url(
-                "📘 Xem Hướng Dẫn 6 Bước (Đóng HSTT & 2FA)",
+                "📘 Xem hướng dẫn 6 bước (đóng HSTT & 2FA)",
                 url,
             )]);
         }
@@ -145,7 +145,7 @@ pub fn payos_amount_keyboard(
         "payos_custom",
     )]);
     rows.push(vec![InlineKeyboardButton::callback(
-        "⬅️ Quay lại Menu chính",
+        "⬅️ Quay lại menu chính",
         "back:home",
     )]);
     InlineKeyboardMarkup::new(rows)
@@ -159,7 +159,7 @@ pub fn vietqr_payment_actions_keyboard(order_code: i64) -> InlineKeyboardMarkup 
             InlineKeyboardButton::callback("❌ Hủy thanh toán", format!("payos_cancel:{order_code}")),
         ],
         vec![InlineKeyboardButton::callback(
-            "⬅️ Quay lại Menu chính",
+            "⬅️ Quay lại menu chính",
             "back:home",
         )],
     ])
@@ -168,7 +168,7 @@ pub fn vietqr_payment_actions_keyboard(order_code: i64) -> InlineKeyboardMarkup 
 /// Simple Back-to-Home inline button.
 pub fn back_to_home_keyboard() -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![vec![InlineKeyboardButton::callback(
-        "⬅️ Quay lại Menu chính",
+        "⬅️ Quay lại menu chính",
         "back:home",
     )]])
 }

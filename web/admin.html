@@ -388,13 +388,13 @@
     </div>
 
     <button class="nav-btn active" onclick="switchPane('settings', this)">
-      <i class="bx bx-slider-alt"></i> Cấu hình Hệ thống
+      <i class="bx bx-slider-alt"></i> Cấu hình hệ thống
     </button>
     <button class="nav-btn" onclick="switchPane('orders', this)">
-      <i class="bx bx-receipt"></i> Đơn Kích Hoạt
+      <i class="bx bx-receipt"></i> Đơn kích hoạt
     </button>
     <button class="nav-btn" onclick="switchPane('plans', this)">
-      <i class="bx bx-package"></i> Gói Gemini &amp; Ví
+      <i class="bx bx-package"></i> Gói Gemini &amp; ví
     </button>
     <button class="nav-btn" onclick="switchPane('bot', this)">
       <i class="bx bx-qr-scan"></i> Kết nối Bot &amp; QR
@@ -409,7 +409,7 @@
   <div class="main">
     <header class="topbar">
       <div class="topbar-title">
-        <h1>Bảng Điều Khiển Quản Trị</h1>
+        <h1>Bảng điều khiển quản trị</h1>
         <span id="connPill" class="conn-pill"><i class="bx bx-radio-circle-marked"></i> Chưa kết nối</span>
       </div>
       <div class="auth-box">
@@ -460,7 +460,7 @@
       <section id="pane-settings" class="pane active">
         <div class="card">
           <div class="card-head">
-            <div class="card-title"><i class="bx bx-cog"></i> Cấu Hình Vận Hành (Áp Dụng Ngay Lập Tức)</div>
+            <div class="card-title"><i class="bx bx-cog"></i> Cấu hình vận hành (áp dụng ngay lập tức)</div>
             <button class="btn btn-ghost" onclick="loadSettings()"><i class="bx bx-refresh"></i> Tải lại</button>
           </div>
 
@@ -504,7 +504,7 @@
 
           <div style="margin-top:18px;display:flex;justify-content:flex-end;">
             <button class="btn btn-ok" onclick="saveSettings()">
-              <i class="bx bx-save"></i> Lưu Cấu Hình Hệ Thống
+              <i class="bx bx-save"></i> Lưu cấu hình hệ thống
             </button>
           </div>
         </div>
@@ -514,7 +514,7 @@
       <section id="pane-orders" class="pane">
         <div class="card">
           <div class="card-head">
-            <div class="card-title"><i class="bx bx-receipt"></i> Danh Sách Đơn Kích Hoạt Gemini Pro</div>
+            <div class="card-title"><i class="bx bx-receipt"></i> Danh sách đơn kích hoạt Gemini Pro</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <select id="orderStatusFilter" onchange="loadOrders()">
                 <option value="PENDING">Đang chờ xử lý (PENDING)</option>
@@ -533,7 +533,7 @@
       <section id="pane-plans" class="pane">
         <div class="card">
           <div class="card-head">
-            <div class="card-title"><i class="bx bx-package"></i> Quản Lý Gói Kích Hoạt Gemini Pro</div>
+            <div class="card-title"><i class="bx bx-package"></i> Quản lý gói kích hoạt Gemini Pro</div>
             <button class="btn btn-ghost" onclick="loadPlans()"><i class="bx bx-refresh"></i> Tải lại</button>
           </div>
           <div id="plansList" style="font-size:0.88rem;color:var(--muted);">Nhập ADMIN_API_KEY để quản lý gói.</div>
@@ -541,7 +541,7 @@
 
         <div class="card">
           <div class="card-head">
-            <div class="card-title"><i class="bx bx-wallet-alt"></i> Cộng Tiền Ví Thủ Công (Hỗ Trợ / Test Luồng Form)</div>
+            <div class="card-title"><i class="bx bx-wallet-alt"></i> Cộng tiền ví thủ công (hỗ trợ / test luồng form)</div>
           </div>
           <div class="form-grid">
             <div class="form-group">
@@ -559,7 +559,7 @@
           </div>
           <div style="margin-top:14px;">
             <button class="btn btn-ok" onclick="manualCredit()">
-              <i class="bx bx-plus-circle"></i> Cộng Tiền Vào Ví
+              <i class="bx bx-plus-circle"></i> Cộng tiền vào ví
             </button>
           </div>
         </div>
@@ -569,7 +569,7 @@
       <section id="pane-bot" class="pane">
         <div class="grid-3">
           <div class="card">
-            <div class="card-title" style="margin-bottom:8px;"><i class="bx bx-qr"></i> Quét QR Tạo Bot (@BotFather)</div>
+            <div class="card-title" style="margin-bottom:8px;"><i class="bx bx-qr"></i> Quét QR tạo Bot (@BotFather)</div>
             <p style="font-size:0.82rem;color:var(--muted);">Quét mã QR bằng điện thoại để mở thẳng lệnh <code>/newbot</code> trên Telegram:</p>
             <div class="qr-box">
               <img src="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=https://t.me/BotFather?start=newbot" alt="QR BotFather" />
@@ -583,7 +583,7 @@
           </div>
 
           <div class="card">
-            <div class="card-title" style="margin-bottom:8px;"><i class="bx bx-user-pin"></i> Quét QR Lấy Admin ID</div>
+            <div class="card-title" style="margin-bottom:8px;"><i class="bx bx-user-pin"></i> Quét QR lấy Admin ID</div>
             <p style="font-size:0.82rem;color:var(--muted);">Lấy Telegram ID của bạn để nhận thông báo đơn mới kèm <code>email | pass | 2fa</code>:</p>
             <div class="qr-box">
               <img src="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=https://t.me/userinfobot" alt="QR UserInfoBot" />
@@ -596,7 +596,7 @@
           </div>
 
           <div class="card">
-            <div class="card-title" style="margin-bottom:8px;"><i class="bx bx-check-circle"></i> Trạng Thái Bot &amp; 1-Click Setup</div>
+            <div class="card-title" style="margin-bottom:8px;"><i class="bx bx-check-circle"></i> Trạng thái Bot &amp; thiết lập nhanh</div>
             <div id="botStatusBox" style="font-size:0.85rem;color:var(--muted);margin-bottom:10px;">
               Bấm <strong>Kết nối</strong> ở thanh trên để kiểm tra Bot.
             </div>
@@ -608,22 +608,22 @@
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
               <button class="btn btn-primary" onclick="loadBotStatus()"><i class="bx bx-refresh"></i> Kiểm tra</button>
-              <button class="btn btn-ok" onclick="autoSetupBot(false)"><i class="bx bx-menu"></i> Đăng ký Menu</button>
-              <button class="btn btn-ghost" onclick="autoSetupBot(true)"><i class="bx bx-globe"></i> Set Webhook</button>
+              <button class="btn btn-ok" onclick="autoSetupBot(false)"><i class="bx bx-menu"></i> Đăng ký menu</button>
+              <button class="btn btn-ghost" onclick="autoSetupBot(true)"><i class="bx bx-globe"></i> Set webhook</button>
             </div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-head">
-            <div class="card-title"><i class="bx bx-link-alt"></i> Webhook Cổng Thanh Toán &amp; Liên Kết Mini App</div>
+            <div class="card-title"><i class="bx bx-link-alt"></i> Webhook cổng thanh toán &amp; liên kết Mini App</div>
           </div>
           <div style="font-size:0.83rem;color:var(--muted);">URL Webhook nhận giao dịch VietQR tự động (cấu hình trong trang quản trị cổng thanh toán):</div>
           <div class="code-line">
             <span id="payosWebhookUrl">https://&lt;your-domain&gt;/api/v1/webhooks/payos</span>
             <button class="btn btn-ghost" onclick="copyText(document.getElementById('payosWebhookUrl').textContent)"><i class="bx bx-copy"></i> Copy</button>
           </div>
-          <div style="font-size:0.83rem;color:var(--muted);margin-top:12px;">Liên kết Trang Hướng Dẫn 4 Bước (Đóng HSTT &amp; Lấy 2FA):</div>
+          <div style="font-size:0.83rem;color:var(--muted);margin-top:12px;">Liên kết trang hướng dẫn 6 bước (đóng HSTT &amp; lấy 2FA):</div>
           <div class="code-line">
             <span id="guideUrlText">https://&lt;your-domain&gt;/webapp/guide</span>
             <button class="btn btn-ghost" onclick="copyText(document.getElementById('guideUrlText').textContent)"><i class="bx bx-copy"></i> Copy</button>

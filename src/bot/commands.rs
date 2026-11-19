@@ -24,7 +24,7 @@ pub enum Command {
     Payadd,
     #[command(description = "🎁 Mời bạn bè & xem thống kê tiền thưởng")]
     Ref,
-    #[command(description = "📘 Hướng dẫn đóng HSTT, kiểm tra Quốc gia & lấy 2FA")]
+    #[command(description = "📘 Hướng dẫn đóng HSTT & lấy mã 2FA")]
     Guide,
 }
 
@@ -391,7 +391,7 @@ pub async fn handle_show_plans(
     } else {
         bot.send_message(
             chat_id,
-            "🤖 <b>Chọn gói Kích Hoạt Gemini Pro Chính Chủ (Your Mail) bên dưới:</b>",
+            "🤖 <b>Chọn gói kích hoạt Gemini Pro chính chủ (Your Mail) bên dưới:</b>",
         )
         .parse_mode(ParseMode::Html)
         .reply_markup(keyboards::plan_selector_keyboard(&plans))
@@ -423,10 +423,10 @@ pub async fn handle_payadd(
         .unwrap_or_else(|| vec![40_000, 80_000, 150_000, 300_000]);
 
     let msg = format!(
-        "💰 <b>Ví Của Bạn</b>\n\
+        "💰 <b>Ví của bạn</b>\n\
          • Số dư khả dụng: <b>{} đ</b>\n\
          • Nạp tối thiểu mỗi lần: <b>{} đ</b>\n\n\
-         💳 <b>Nạp tiền tự động qua Chuyển khoản Ngân hàng (VietQR 24/7)</b>\n\
+         💳 <b>Nạp tiền tự động qua chuyển khoản ngân hàng (VietQR 24/7)</b>\n\
          Chọn mệnh giá nạp nhanh hoặc bấm <b>✏️ Nhập số tiền khác</b> bên dưới:",
         format_vnd(balance),
         format_vnd(min_deposit),
@@ -466,7 +466,7 @@ async fn handle_my_orders(
         return Ok(());
     }
 
-    let mut lines = vec!["📦 <b>10 Đơn Kích Hoạt Gần Nhất:</b>\n".to_string()];
+    let mut lines = vec!["📦 <b>10 đơn kích hoạt gần nhất:</b>\n".to_string()];
     for o in orders {
         let icon = match o.status.as_str() {
             "COMPLETED" => "✅",
@@ -498,31 +498,31 @@ async fn handle_guide(bot: &Bot, chat_id: ChatId, state: &SharedState) -> Respon
     if let Ok(url) = Url::parse(&guide_url) {
         if url.scheme() == "https" {
             rows.push(vec![InlineKeyboardButton::web_app(
-                "📘 Mở Trang Hướng Dẫn 6 Bước (Đóng HSTT & 2FA)",
+                "📘 Mở trang hướng dẫn 6 bước (đóng HSTT & 2FA)",
                 WebAppInfo { url },
             )]);
         } else {
             rows.push(vec![InlineKeyboardButton::url(
-                "📘 Mở Trang Hướng Dẫn 6 Bước (Đóng HSTT & 2FA)",
+                "📘 Mở trang hướng dẫn 6 bước (đóng HSTT & 2FA)",
                 url,
             )]);
         }
     }
     rows.push(vec![InlineKeyboardButton::callback(
-        "⬅️ Quay lại Menu chính",
+        "⬅️ Quay lại menu chính",
         "back:home",
     )]);
 
-    let text = "📘 <b>Hướng Dẫn 6 Bước Chuẩn Bị Gmail Trước Khi Kích Hoạt Gemini Pro</b>\n\n\
-        <b>Phần 1 — Dọn sạch Hồ sơ thanh toán Google (HSTT):</b>\n\
-        1️⃣ Mở Cài đặt Google Payments &amp; chọn đóng hồ sơ cũ\n\
+    let text = "📘 <b>Hướng dẫn 6 bước chuẩn bị Gmail trước khi kích hoạt Gemini Pro</b>\n\n\
+        <b>Phần 1 — Dọn sạch hồ sơ thanh toán Google (HSTT):</b>\n\
+        1️⃣ Mở cài đặt Google Payments &amp; chọn đóng hồ sơ cũ\n\
         2️⃣ Chọn lý do &amp; xác nhận đóng hồ sơ\n\
         3️⃣ Tải lại trang kiểm tra dọn sạch toàn bộ hồ sơ\n\n\
-        <b>Phần 2 — Bật Bảo mật 2 lớp (2FA Authenticator):</b>\n\
+        <b>Phần 2 — Bật bảo mật 2 lớp (2FA Authenticator):</b>\n\
         4️⃣ Mở cài đặt Authenticator Google\n\
         5️⃣ Bấm \"Không thể quét được mã?\" lấy chuỗi khóa 2FA 32 ký tự\n\
         6️⃣ Lấy mã OTP 6 số (có sẵn công cụ ngay trên trang) &amp; hoàn tất bật 2FA\n\n\
-        👇 Bấm nút bên dưới để mở Trang Hướng Dẫn Chi Tiết:";
+        👇 Bấm nút bên dưới để mở trang hướng dẫn chi tiết:";
 
     bot.send_message(chat_id, text)
         .parse_mode(ParseMode::Html)

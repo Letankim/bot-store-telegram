@@ -48,10 +48,10 @@ pub async fn handle_callback(
         state.awaiting_deposit_amount.write().await.insert(telegram_id);
 
         let text = format!(
-            "✏️ <b>Nhập Số Tiền Bạn Muốn Nạp (VND)</b>\n\n\
+            "✏️ <b>Nhập số tiền bạn muốn nạp (VND)</b>\n\n\
              • Số tiền nạp tối thiểu: <b>{} đ</b>\n\
              • Ví dụ: gõ <code>50000</code> hoặc <code>120000</code> rồi gửi ngay tại đây!\n\
-             • Hệ thống sẽ lập tức tạo <b>Mã QR VietQR</b> tương ứng cho bạn.",
+             • Hệ thống sẽ lập tức tạo <b>mã QR VietQR</b> tương ứng cho bạn.",
             format_vnd(min_deposit)
         );
         bot.send_message(chat_id, text)
@@ -146,7 +146,7 @@ pub async fn handle_callback(
             let text = format!(
                 "✅ <b>Số dư hợp lệ ({} đ)!</b>\n\n\
                  Gói đã chọn: <b>{}</b> (Giá: <b>{} đ</b>)\n\
-                 👇 Bấm nút <b>Mở Form Điền Mail | Pass | 2FA</b> bên dưới để nhập thông tin kích hoạt:",
+                 👇 Bấm nút <b>Mở form điền Mail | Pass | 2FA</b> bên dưới để nhập thông tin kích hoạt:",
                 format_vnd(balance),
                 messages::escape_html(&plan.name),
                 format_vnd(plan.price_vnd)
@@ -192,7 +192,7 @@ pub async fn handle_callback(
                     .unwrap_or_default();
 
                 let text = format!(
-                    "✅ <b>Xác Nhận Thanh Toán Thành Công!</b>\n\n\
+                    "✅ <b>Xác nhận thanh toán thành công!</b>\n\n\
                      • Mã giao dịch: <code>{}</code>\n\
                      • Đã cộng vào ví: <b>+{} đ</b>{}\n\
                      • Số dư hiện tại: <b>{} đ</b>\n\n\
