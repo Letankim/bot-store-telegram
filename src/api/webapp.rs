@@ -144,7 +144,7 @@ pub async fn submit_activation(
          • Gmail: <code>{}</code>\n\
          • Đã thanh toán: <b>{} đ</b>\n\
          • Số dư còn lại: <b>{} đ</b>\n\n\
-         ⏳ Đơn hàng sẽ được xử lý và trả trong <b>1–6h</b> (hoặc sớm hơn). Nếu đơn lỗi, hệ thống sẽ hoàn 100% tiền về ví của bạn!",
+         ⏳ Đơn hàng của bạn đã được tiếp nhận và sẽ sớm được xử lý. Nếu đơn lỗi, hệ thống sẽ hoàn 100% tiền về ví của bạn!",
         outcome.order.order_code,
         escape_html(&outcome.plan.name),
         escape_html(&outcome.order.gmail_masked),

@@ -629,7 +629,7 @@
           submitBtn.innerHTML = '<i class="bx bx-rocket"></i> <span>Xác nhận thanh toán &amp; gửi đơn</span>';
           return;
         }
-        showAlert(`Tạo đơn thành công! Mã đơn: ${json.data.order_code}. Đơn sẽ được xử lý trong 1–6h.`, "success");
+        showAlert(`Tạo đơn thành công! Mã đơn: ${json.data.order_code}. Đơn hàng đã được tiếp nhận để xử lý.`, "success");
         setTimeout(() => { if (tg) tg.close(); }, 1800);
       } catch (err) {
         showAlert("Lỗi gửi đơn. Vui lòng kiểm tra kết nối mạng.", "error");
