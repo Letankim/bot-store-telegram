@@ -498,12 +498,12 @@ async fn handle_guide(bot: &Bot, chat_id: ChatId, state: &SharedState) -> Respon
     if let Ok(url) = Url::parse(&guide_url) {
         if url.scheme() == "https" {
             rows.push(vec![InlineKeyboardButton::web_app(
-                "📘 Mở Trang Hướng Dẫn 4 Bước (Interactive)",
+                "📘 Mở Trang Hướng Dẫn 6 Bước (Đóng HSTT & 2FA)",
                 WebAppInfo { url },
             )]);
         } else {
             rows.push(vec![InlineKeyboardButton::url(
-                "📘 Mở Trang Hướng Dẫn 4 Bước",
+                "📘 Mở Trang Hướng Dẫn 6 Bước (Đóng HSTT & 2FA)",
                 url,
             )]);
         }
@@ -513,12 +513,16 @@ async fn handle_guide(bot: &Bot, chat_id: ChatId, state: &SharedState) -> Respon
         "back:home",
     )]);
 
-    let text = "📘 <b>Trang Hướng Dẫn Chuẩn Bị Gmail Trước Khi Kích Hoạt Gemini Pro</b>\n\n\
-        1️⃣ Kiểm tra Quốc gia Gmail (Việt Nam)\n\
-        2️⃣ Kiểm tra tài khoản trắng &amp; Rời nhóm Google Family\n\
-        3️⃣ Đóng Hồ Sơ Thanh Toán (HSTT) Google Pay\n\
-        4️⃣ Bật Xác minh 2 bước &amp; Lấy mã khóa 2FA 32 ký tự (kèm công cụ kiểm tra mã 6 số trực tiếp)\n\n\
-        👇 Bấm nút bên dưới để mở Trang Hướng Dẫn:";
+    let text = "📘 <b>Hướng Dẫn 6 Bước Chuẩn Bị Gmail Trước Khi Kích Hoạt Gemini Pro</b>\n\n\
+        <b>Phần 1 — Dọn sạch Hồ sơ thanh toán Google (HSTT):</b>\n\
+        1️⃣ Mở Cài đặt Google Payments &amp; chọn đóng hồ sơ cũ\n\
+        2️⃣ Chọn lý do &amp; xác nhận đóng hồ sơ\n\
+        3️⃣ Tải lại trang kiểm tra dọn sạch toàn bộ hồ sơ\n\n\
+        <b>Phần 2 — Bật Bảo mật 2 lớp (2FA Authenticator):</b>\n\
+        4️⃣ Mở cài đặt Authenticator Google\n\
+        5️⃣ Bấm \"Không thể quét được mã?\" lấy chuỗi khóa 2FA 32 ký tự\n\
+        6️⃣ Lấy mã OTP 6 số (có sẵn công cụ ngay trên trang) &amp; hoàn tất bật 2FA\n\n\
+        👇 Bấm nút bên dưới để mở Trang Hướng Dẫn Chi Tiết:";
 
     bot.send_message(chat_id, text)
         .parse_mode(ParseMode::Html)

@@ -97,12 +97,12 @@ pub fn open_activate_webapp_keyboard(
     if let Ok(url) = Url::parse(guide_url) {
         if url.scheme() == "https" {
             rows.push(vec![InlineKeyboardButton::web_app(
-                "📘 Xem Trang Hướng Dẫn 4 Bước",
+                "📘 Xem Hướng Dẫn 6 Bước (Đóng HSTT & 2FA)",
                 WebAppInfo { url },
             )]);
         } else {
             rows.push(vec![InlineKeyboardButton::url(
-                "📘 Xem Trang Hướng Dẫn 4 Bước",
+                "📘 Xem Hướng Dẫn 6 Bước (Đóng HSTT & 2FA)",
                 url,
             )]);
         }
