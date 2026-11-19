@@ -150,7 +150,7 @@ pub async fn submit_activation(
                 &outcome.normalized.email,
                 &outcome.normalized.password,
                 &outcome.normalized.two_fa_compact_upper,
-                &settings.smm_default_mode,
+                &outcome.plan.api_mode,
             )
             .await
             {

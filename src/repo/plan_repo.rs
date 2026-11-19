@@ -84,13 +84,14 @@ pub async fn create_plan(
     price_vnd: i64,
     available_stock: i32,
     description_note: &str,
+    api_mode: &str,
     display_order: i32,
 ) -> Result<GeminiPlan, AppError> {
     let created = sqlx::query_as::<_, GeminiPlan>(
         "INSERT INTO gemini_plans (
             code, name, duration_months, price_vnd, available_stock, sold_count,
-            description_note, is_active, display_order
-         ) VALUES ($1, $2, $3, $4, $5, 0, $6, TRUE, $7)
+            description_note, api_mode, is_active, display_order
+         ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, TRUE, $8)
          RETURNING *",
     )
     .bind(code.trim().to_uppercase())
@@ -99,6 +100,7 @@ pub async fn create_plan(
     .bind(price_vnd)
     .bind(available_stock)
     .bind(description_note.trim())
+    .bind(api_mode)
     .bind(display_order)
     .fetch_one(pool)
     .await?;
@@ -116,6 +118,7 @@ pub async fn update_plan_full(
     available_stock: Option<i32>,
     sold_count: Option<i32>,
     description_note: Option<&str>,
+    api_mode: Option<&str>,
     display_order: Option<i32>,
     is_active: Option<bool>,
 ) -> Result<GeminiPlan, AppError> {
@@ -127,10 +130,11 @@ pub async fn update_plan_full(
              available_stock = COALESCE($4, available_stock),
              sold_count = COALESCE($5, sold_count),
              description_note = COALESCE($6, description_note),
-             display_order = COALESCE($7, display_order),
-             is_active = COALESCE($8, is_active),
+             api_mode = COALESCE($7, api_mode),
+             display_order = COALESCE($8, display_order),
+             is_active = COALESCE($9, is_active),
              updated_at = NOW()
-         WHERE id = $9
+         WHERE id = $10
          RETURNING *",
     )
     .bind(name.map(str::trim))
@@ -139,6 +143,7 @@ pub async fn update_plan_full(
     .bind(available_stock)
     .bind(sold_count)
     .bind(description_note.map(str::trim))
+    .bind(api_mode)
     .bind(display_order)
     .bind(is_active)
     .bind(plan_id)

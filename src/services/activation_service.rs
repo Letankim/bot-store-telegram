@@ -25,6 +25,8 @@ pub struct AdminOrderView {
     pub order_code: String,
     pub user_id: Uuid,
     pub plan_id: Uuid,
+    pub plan_name: String,
+    pub plan_api_mode: String,
     pub price_paid_vnd: i64,
     pub gmail_masked: String,
     pub credentials_formatted: String,
@@ -128,11 +130,11 @@ impl ActivationService {
         })
     }
 
-    /// Decrypt an existing order's credentials (used when Admin clicks "Đẩy qua API").
+    /// Decrypt an existing order's credentials along with its plan `api_mode` & user telegram ID.
     pub async fn load_decrypted_order(
         &self,
         order_id: Uuid,
-    ) -> Result<(ActivationOrder, NormalizedCredentials, Option<i64>), AppError> {
+    ) -> Result<(ActivationOrder, NormalizedCredentials, Option<i64>, String), AppError> {
         let order = activation_repo::find_by_id(&self.pool, order_id)
             .await?
             .ok_or_else(|| AppError::NotFound("Không tìm thấy đơn kích hoạt".to_string()))?;
@@ -144,11 +146,15 @@ impl ActivationService {
         let tg_id = user_repo::find_by_id(&self.pool, order.user_id)
             .await?
             .map(|u| u.telegram_id);
+        let plan_api_mode = plan_repo::find_by_id(&self.pool, order.plan_id)
+            .await?
+            .map(|p| p.api_mode)
+            .unwrap_or_else(|| "autopay".to_string());
 
-        Ok((order, parsed, tg_id))
+        Ok((order, parsed, tg_id, plan_api_mode))
     }
 
-    /// List orders for Admin API with decrypted `email | pass | 2fa` string.
+    /// List orders for Admin API with decrypted `email | pass | 2fa` string and plan `api_mode`.
     pub async fn list_orders_for_admin(
         &self,
         status: Option<&str>,
@@ -163,16 +169,25 @@ impl ActivationService {
             activation_repo::list_for_admin(&self.pool, status, i64::from(per_page_clamped), offset)
                 .await?;
 
+        let all_plans = plan_repo::list_all_plans(&self.pool).await.unwrap_or_default();
+
         let mut views = Vec::with_capacity(orders.len());
         for order in orders {
             let decrypted = self
                 .crypto
                 .decrypt(&order.credentials_encrypted, &order.nonce)?;
+            let plan = all_plans.iter().find(|p| p.id == order.plan_id);
             views.push(AdminOrderView {
                 id: order.id,
                 order_code: order.order_code,
                 user_id: order.user_id,
                 plan_id: order.plan_id,
+                plan_name: plan
+                    .map(|p| p.name.clone())
+                    .unwrap_or_else(|| "Gemini Pro".to_string()),
+                plan_api_mode: plan
+                    .map(|p| p.api_mode.clone())
+                    .unwrap_or_else(|| "autopay".to_string()),
                 price_paid_vnd: order.price_paid_vnd,
                 gmail_masked: order.gmail_masked,
                 credentials_formatted: decrypted,

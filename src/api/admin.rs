@@ -153,6 +153,7 @@ pub struct CreatePlanReq {
     pub price_vnd: i64,
     pub available_stock: i32,
     pub description_note: String,
+    pub api_mode: Option<String>,
     pub display_order: Option<i32>,
 }
 
@@ -173,6 +174,13 @@ pub async fn create_plan(
         ));
     }
 
+    let api_mode = payload.api_mode.as_deref().unwrap_or("autopay");
+    if !matches!(api_mode, "autopay" | "payadd" | "extract") {
+        return Err(AppError::Validation(
+            "Chế độ API gói chỉ hỗ trợ: autopay, payadd, hoặc extract.".to_string(),
+        ));
+    }
+
     let created = plan_repo::create_plan(
         &state.pool,
         &payload.code,
@@ -181,6 +189,7 @@ pub async fn create_plan(
         payload.price_vnd,
         payload.available_stock,
         &payload.description_note,
+        api_mode,
         payload.display_order.unwrap_or(10),
     )
     .await?;
@@ -279,7 +288,7 @@ pub struct PushOrderApiRes {
 }
 
 /// Admin manually pushes a PENDING order from the queue to the upstream Pixel API (`api.smm.io.vn`)
-/// and starts real-time 6-step progress notifications to the customer on Telegram.
+/// using the plan's configured `api_mode` (or optional override) and starts live 6-step Telegram progress.
 pub async fn push_order_to_api(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
@@ -287,7 +296,7 @@ pub async fn push_order_to_api(
     Json(payload): Json<PushOrderApiReq>,
 ) -> Result<ApiResponse<PushOrderApiRes>, AppError> {
     let settings = settings_repo::get_settings(&state.pool).await?;
-    let (order, creds, user_tg_id) = state
+    let (order, creds, user_tg_id, plan_api_mode) = state
         .activation_service
         .load_decrypted_order(order_id)
         .await?;
@@ -303,7 +312,7 @@ pub async fn push_order_to_api(
         .mode
         .as_deref()
         .filter(|s| !s.is_empty())
-        .unwrap_or(&settings.smm_default_mode);
+        .unwrap_or(&plan_api_mode);
 
     let job = smm_service::submit_pixel_job(
         &settings.smm_api_base_url,
@@ -341,6 +350,156 @@ pub async fn push_order_to_api(
             mode: job.mode,
         },
         "Đã đẩy đơn sang API đối tác và bật tiến trình trực tiếp cho khách hàng",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BatchPushOrdersReq {
+    pub order_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BatchPushItemRes {
+    pub order_id: Uuid,
+    pub order_code: Option<String>,
+    pub ok: bool,
+    pub external_job_id: Option<i64>,
+    pub mode: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BatchPushOrdersRes {
+    pub pushed: usize,
+    pub failed: usize,
+    pub results: Vec<BatchPushItemRes>,
+}
+
+/// Admin batch-pushes tick-selected PENDING orders to upstream Pixel API using each order's own plan `api_mode`.
+pub async fn batch_push_orders_to_api(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Json(payload): Json<BatchPushOrdersReq>,
+) -> Result<ApiResponse<BatchPushOrdersRes>, AppError> {
+    if payload.order_ids.is_empty() {
+        return Err(AppError::Validation(
+            "Vui lòng tick chọn ít nhất 1 đơn hàng để đẩy qua API.".to_string(),
+        ));
+    }
+
+    let settings = settings_repo::get_settings(&state.pool).await?;
+    if settings.smm_api_key.trim().is_empty() {
+        return Err(AppError::Validation(
+            "Chưa cấu hình API Key đối tác trong mục Cấu hình hệ thống.".to_string(),
+        ));
+    }
+
+    let mut pushed = 0usize;
+    let mut failed = 0usize;
+    let mut results = Vec::with_capacity(payload.order_ids.len());
+
+    for order_id in payload.order_ids {
+        let loaded = state
+            .activation_service
+            .load_decrypted_order(order_id)
+            .await;
+
+        let (order, creds, user_tg_id, plan_api_mode) = match loaded {
+            Ok(tuple) => tuple,
+            Err(err) => {
+                failed += 1;
+                results.push(BatchPushItemRes {
+                    order_id,
+                    order_code: None,
+                    ok: false,
+                    external_job_id: None,
+                    mode: None,
+                    error: Some(err.to_string()),
+                });
+                continue;
+            }
+        };
+
+        if order.status != "PENDING" {
+            failed += 1;
+            results.push(BatchPushItemRes {
+                order_id,
+                order_code: Some(order.order_code),
+                ok: false,
+                external_job_id: None,
+                mode: Some(plan_api_mode),
+                error: Some(format!("Trạng thái hiện tại là {}", order.status)),
+            });
+            continue;
+        }
+
+        match smm_service::submit_pixel_job(
+            &settings.smm_api_base_url,
+            &settings.smm_api_key,
+            &creds.email,
+            &creds.password,
+            &creds.two_fa_compact_upper,
+            &plan_api_mode,
+        )
+        .await
+        {
+            Ok(job) => {
+                let _ = activation_repo::set_external_job_started(
+                    &state.pool,
+                    order.id,
+                    job.job_id,
+                    &job.mode,
+                )
+                .await;
+
+                if let Some(tg_id) = user_tg_id {
+                    smm_service::spawn_live_job_tracker(
+                        state.clone(),
+                        order.id,
+                        order.order_code.clone(),
+                        tg_id,
+                        creds.email,
+                        job.job_id,
+                        job.position,
+                        job.mode.clone(),
+                        settings.smm_api_base_url.clone(),
+                        settings.smm_api_key.clone(),
+                    );
+                }
+
+                pushed += 1;
+                results.push(BatchPushItemRes {
+                    order_id: order.id,
+                    order_code: Some(order.order_code),
+                    ok: true,
+                    external_job_id: Some(job.job_id),
+                    mode: Some(job.mode),
+                    error: None,
+                });
+            }
+            Err(err) => {
+                failed += 1;
+                results.push(BatchPushItemRes {
+                    order_id: order.id,
+                    order_code: Some(order.order_code),
+                    ok: false,
+                    external_job_id: None,
+                    mode: Some(plan_api_mode),
+                    error: Some(err.to_string()),
+                });
+            }
+        }
+    }
+
+    let message = format!("Đã đẩy thành công {pushed} đơn, lỗi {failed} đơn.");
+    Ok(ApiResponse::ok(
+        BatchPushOrdersRes {
+            pushed,
+            failed,
+            results,
+        },
+        message,
         ctx.request_id,
     ))
 }
@@ -501,17 +660,26 @@ pub struct UpdatePlanReq {
     pub available_stock: Option<i32>,
     pub sold_count: Option<i32>,
     pub description_note: Option<String>,
+    pub api_mode: Option<String>,
     pub display_order: Option<i32>,
     pub is_active: Option<bool>,
 }
 
-/// Update full details of a Gemini Pro plan (name, price, stock, sold count, description, status).
+/// Update full details of a Gemini Pro plan (name, price, stock, sold count, description, api_mode, status).
 pub async fn update_plan(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
     Path(plan_id): Path<Uuid>,
     Json(payload): Json<UpdatePlanReq>,
 ) -> Result<ApiResponse<GeminiPlan>, AppError> {
+    if let Some(mode) = payload.api_mode.as_deref() {
+        if !matches!(mode, "autopay" | "payadd" | "extract") {
+            return Err(AppError::Validation(
+                "Chế độ API gói chỉ hỗ trợ: autopay, payadd, hoặc extract.".to_string(),
+            ));
+        }
+    }
+
     let updated = plan_repo::update_plan_full(
         &state.pool,
         plan_id,
@@ -521,6 +689,7 @@ pub async fn update_plan(
         payload.available_stock,
         payload.sold_count,
         payload.description_note.as_deref(),
+        payload.api_mode.as_deref(),
         payload.display_order,
         payload.is_active,
     )
