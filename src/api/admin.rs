@@ -163,6 +163,7 @@ pub struct UpdateSettingsReq {
     pub support_handle: String,
     pub min_deposit_vnd: i64,
     pub referral_reward_vnd: i64,
+    pub referred_bonus_vnd: i64,
     pub referral_min_first_deposit_vnd: i64,
     pub quick_deposit_amounts: String,
 }
@@ -178,6 +179,7 @@ pub async fn update_settings(
         &payload.support_handle,
         payload.min_deposit_vnd,
         payload.referral_reward_vnd,
+        payload.referred_bonus_vnd,
         payload.referral_min_first_deposit_vnd,
         &payload.quick_deposit_amounts,
     )

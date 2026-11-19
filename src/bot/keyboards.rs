@@ -9,8 +9,9 @@ pub const BTN_GEMINI_PRO: &str = "🤖 Kích hoạt Gemini Pro";
 pub const BTN_WALLET: &str = "💰 Ví & Nạp tiền";
 pub const BTN_ORDERS: &str = "📦 Đơn hàng của tôi";
 pub const BTN_GUIDE: &str = "📘 Hướng dẫn 2FA & HSTT";
+pub const BTN_REFERRAL: &str = "🎁 Mời bạn bè & Thưởng";
 
-/// Persistent 2x2 Reply Keyboard at bottom of Telegram chat.
+/// Persistent Reply Keyboard at bottom of Telegram chat.
 pub fn main_reply_keyboard() -> KeyboardMarkup {
     KeyboardMarkup::new(vec![
         vec![
@@ -21,6 +22,7 @@ pub fn main_reply_keyboard() -> KeyboardMarkup {
             KeyboardButton::new(BTN_WALLET),
             KeyboardButton::new(BTN_GUIDE),
         ],
+        vec![KeyboardButton::new(BTN_REFERRAL)],
     ])
     .resize_keyboard()
     .persistent()

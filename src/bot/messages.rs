@@ -13,16 +13,26 @@ pub fn welcome_message(
     balance_vnd: i64,
     ref_link: &str,
     reward_vnd: i64,
+    referred_bonus_vnd: i64,
     min_first_deposit_vnd: i64,
     support_handle: &str,
 ) -> String {
+    let friend_bonus_line = if referred_bonus_vnd > 0 {
+        format!(
+            "\n<i>• Bạn bè được mời cũng nhận ngay <b>{} đ</b> thưởng vào ví khi hoàn tất lần nạp đầu tiên!</i>",
+            format_vnd(referred_bonus_vnd)
+        )
+    } else {
+        String::new()
+    };
+
     format!(
         "👋 Xin chào <b>{}</b>!\n\n\
          🤖 Chào mừng bạn đến với hệ thống <b>Kích Hoạt Gemini Pro Chính Chủ (Your Mail)</b> tự động.\n\n\
          💰 Số dư ví hiện tại: <b>{} đ</b>\n\
          🎁 <b>Chương trình mời bạn bè:</b>\n\
          <code>{}</code>\n\
-         <i>• Nhận ngay <b>{} đ</b> vào ví khi bạn bè đăng ký qua link và bắt buộc nạp tiền lần đầu tiên (tối thiểu {} đ).</i>\n\n\
+         <i>• Bạn nhận ngay <b>{} đ</b> khi bạn bè đăng ký qua link và bắt buộc nạp tiền lần đầu (tối thiểu {} đ).</i>{}\n\n\
          🛟 Hỗ trợ: {}\n\
          👇 Chọn chức năng bên dưới hoặc gõ /pixel để xem gói kích hoạt Gemini Pro!",
         escape_html(full_name),
@@ -30,7 +40,65 @@ pub fn welcome_message(
         escape_html(ref_link),
         format_vnd(reward_vnd),
         format_vnd(min_first_deposit_vnd),
+        friend_bonus_line,
         escape_html(support_handle),
+    )
+}
+
+pub fn referral_dashboard_message(
+    ref_link: &str,
+    reward_vnd: i64,
+    referred_bonus_vnd: i64,
+    min_first_deposit_vnd: i64,
+    summary: &crate::services::referral_service::ReferralSummary,
+) -> String {
+    let mut friend_list = String::new();
+    if summary.recent_friends.is_empty() {
+        friend_list.push_str("<i>Chưa có bạn bè nào tham gia qua link của bạn.</i>");
+    } else {
+        for (idx, f) in summary.recent_friends.iter().enumerate() {
+            let status_txt = if f.status == "REWARDED" {
+                format!("✅ Đã nhận <b>+{} đ</b>", format_vnd(f.reward_vnd))
+            } else {
+                "⏳ Chờ nạp lần đầu".to_string()
+            };
+            friend_list.push_str(&format!(
+                "{}. <b>{}</b> — {}\n",
+                idx + 1,
+                escape_html(&f.full_name),
+                status_txt
+            ));
+        }
+    }
+
+    let friend_bonus_txt = if referred_bonus_vnd > 0 {
+        format!("\n• Người được mời nhận: <b>+{} đ</b>", format_vnd(referred_bonus_vnd))
+    } else {
+        String::new()
+    };
+
+    format!(
+        "🎁 <b>MỜI BẠN BÈ &amp; THỐNG KÊ TIỀN THƯỞNG</b>\n\n\
+         🔗 <b>Link giới thiệu của bạn (chạm để copy):</b>\n\
+         <code>{}</code>\n\n\
+         📌 <b>Chính sách thưởng hiện tại:</b>\n\
+         • Bạn (người mời) nhận: <b>+{} đ</b>{}\n\
+         • Điều kiện: Bạn bè bắt buộc nạp tiền lần đầu tối thiểu <b>{} đ</b>.\n\n\
+         📊 <b>Thống kê của bạn:</b>\n\
+         • 👥 Tổng số người đã mời: <b>{} người</b>\n\
+         • ✅ Đã nạp lần đầu (đã thưởng): <b>{} người</b>\n\
+         • ⏳ Đang chờ nạp lần đầu: <b>{} người</b>\n\
+         • 💰 Tổng tiền thưởng đã nhận: <b>{} đ</b>\n\n\
+         📋 <b>Danh sách bạn bè đã mời gần nhất:</b>\n{}",
+        escape_html(ref_link),
+        format_vnd(reward_vnd),
+        friend_bonus_txt,
+        format_vnd(min_first_deposit_vnd),
+        summary.total_invited,
+        summary.rewarded_count,
+        summary.pending_count,
+        format_vnd(summary.total_earned_vnd),
+        friend_list.trim_end(),
     )
 }
 

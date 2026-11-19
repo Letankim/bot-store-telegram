@@ -58,14 +58,27 @@ pub async fn payos_webhook(
 
     if !outcome.already_processed {
         if let Some(tg_id) = outcome.user_telegram_id {
+            let bonus_note = outcome
+                .referral_reward
+                .as_ref()
+                .filter(|r| r.referred_bonus_vnd > 0)
+                .map(|r| {
+                    format!(
+                        "\n🎁 Thưởng chào mừng nạp lần đầu (qua link mời): <b>+{} đ</b>",
+                        format_vnd(r.referred_bonus_vnd)
+                    )
+                })
+                .unwrap_or_default();
+
             let msg = format!(
                 "✅ <b>Nạp tiền vào ví thành công!</b>\n\n\
                  • Mã giao dịch: <code>{}</code>\n\
-                 • Số tiền đã nạp: <b>+{} đ</b>\n\
+                 • Số tiền đã nạp: <b>+{} đ</b>{}\n\
                  • Số dư ví hiện tại: <b>{} đ</b>\n\n\
                  🚀 Bấm /pixel để kích hoạt Gemini Pro ngay bây giờ!",
                 outcome.order_code,
                 format_vnd(outcome.amount_vnd),
+                bonus_note,
                 format_vnd(outcome.new_balance_vnd),
             );
             let _ = state

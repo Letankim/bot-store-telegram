@@ -8,6 +8,7 @@ pub struct AppSettings {
     pub support_handle: String,
     pub min_deposit_vnd: i64,
     pub referral_reward_vnd: i64,
+    pub referred_bonus_vnd: i64,
     pub referral_min_first_deposit_vnd: i64,
     pub quick_deposit_amounts: String,
     pub updated_at: DateTime<Utc>,

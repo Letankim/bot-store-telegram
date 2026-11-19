@@ -14,6 +14,7 @@ pub async fn update_settings(
     support_handle: &str,
     min_deposit_vnd: i64,
     referral_reward_vnd: i64,
+    referred_bonus_vnd: i64,
     referral_min_first_deposit_vnd: i64,
     quick_deposit_amounts: &str,
 ) -> Result<AppSettings, AppError> {
@@ -22,7 +23,7 @@ pub async fn update_settings(
             "Số tiền nạp tối thiểu phải từ 1.000 đ trở lên.".to_string(),
         ));
     }
-    if referral_reward_vnd < 0 || referral_min_first_deposit_vnd < 0 {
+    if referral_reward_vnd < 0 || referred_bonus_vnd < 0 || referral_min_first_deposit_vnd < 0 {
         return Err(AppError::Validation(
             "Giá trị thưởng và điều kiện nạp lần đầu không được âm.".to_string(),
         ));
@@ -40,8 +41,9 @@ pub async fn update_settings(
          SET support_handle = $1,
              min_deposit_vnd = $2,
              referral_reward_vnd = $3,
-             referral_min_first_deposit_vnd = $4,
-             quick_deposit_amounts = $5,
+             referred_bonus_vnd = $4,
+             referral_min_first_deposit_vnd = $5,
+             quick_deposit_amounts = $6,
              updated_at = NOW()
          WHERE id = 1
          RETURNING *",
@@ -49,6 +51,7 @@ pub async fn update_settings(
     .bind(handle_clean)
     .bind(min_deposit_vnd)
     .bind(referral_reward_vnd)
+    .bind(referred_bonus_vnd)
     .bind(referral_min_first_deposit_vnd)
     .bind(quick_deposit_amounts.trim())
     .fetch_one(pool)

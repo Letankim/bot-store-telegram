@@ -379,6 +379,11 @@ impl PayOsService {
         )
         .await?;
 
+        let final_balance = referral_reward
+            .as_ref()
+            .and_then(|r| r.referred_new_balance_vnd)
+            .unwrap_or(updated_wallet.balance_vnd);
+
         tx.commit().await?;
 
         let user = user_repo::find_by_id(&self.pool, deposit.user_id).await?;
@@ -388,7 +393,7 @@ impl PayOsService {
             order_code,
             user_telegram_id: user.map(|u| u.telegram_id),
             amount_vnd: credit_amount,
-            new_balance_vnd: updated_wallet.balance_vnd,
+            new_balance_vnd: final_balance,
             referral_reward,
         })
     }

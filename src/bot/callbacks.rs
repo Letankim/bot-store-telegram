@@ -179,14 +179,27 @@ pub async fn handle_callback(
             .await
         {
             Ok(CheckPaymentStatus::PaidNow(outcome)) => {
+                let bonus_note = outcome
+                    .referral_reward
+                    .as_ref()
+                    .filter(|r| r.referred_bonus_vnd > 0)
+                    .map(|r| {
+                        format!(
+                            "\n🎁 Thưởng chào mừng nạp lần đầu (qua link mời): <b>+{} đ</b>",
+                            format_vnd(r.referred_bonus_vnd)
+                        )
+                    })
+                    .unwrap_or_default();
+
                 let text = format!(
                     "✅ <b>Xác Nhận Thanh Toán Thành Công!</b>\n\n\
                      • Mã giao dịch: <code>{}</code>\n\
-                     • Đã cộng vào ví: <b>+{} đ</b>\n\
+                     • Đã cộng vào ví: <b>+{} đ</b>{}\n\
                      • Số dư hiện tại: <b>{} đ</b>\n\n\
                      🚀 Bấm /pixel để kích hoạt Gemini Pro ngay bây giờ!",
                     outcome.order_code,
                     format_vnd(outcome.amount_vnd),
+                    bonus_note,
                     format_vnd(outcome.new_balance_vnd)
                 );
                 bot.send_message(chat_id, text)

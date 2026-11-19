@@ -35,6 +35,7 @@ pub async fn ensure_user_with_wallet(
     full_name: &str,
     referred_by: Option<Uuid>,
     referral_reward_vnd: i64,
+    referred_bonus_vnd: i64,
 ) -> Result<(User, bool), AppError> {
     if let Some(existing) = sqlx::query_as::<_, User>(
         "SELECT * FROM users WHERE telegram_id = $1 FOR UPDATE",
@@ -76,13 +77,14 @@ pub async fn ensure_user_with_wallet(
 
     if let Some(referrer_id) = referred_by {
         sqlx::query(
-            "INSERT INTO referrals (referrer_id, referred_user_id, reward_vnd, status)
-             VALUES ($1, $2, $3, 'PENDING_FIRST_DEPOSIT')
+            "INSERT INTO referrals (referrer_id, referred_user_id, reward_vnd, referred_bonus_vnd, status)
+             VALUES ($1, $2, $3, $4, 'PENDING_FIRST_DEPOSIT')
              ON CONFLICT (referred_user_id) DO NOTHING",
         )
         .bind(referrer_id)
         .bind(user.id)
         .bind(referral_reward_vnd)
+        .bind(referred_bonus_vnd)
         .execute(&mut **tx)
         .await?;
     }

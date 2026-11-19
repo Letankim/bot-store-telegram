@@ -9,6 +9,7 @@ use crate::{
     bot::{keyboards, messages},
     domain::wallet::format_vnd,
     repo::{activation_repo, plan_repo, settings_repo, user_repo, wallet_repo},
+    services::referral_service,
     state::SharedState,
 };
 
@@ -21,6 +22,8 @@ pub enum Command {
     Pixel,
     #[command(description = "💳 Nạp tiền tự động qua ngân hàng (VietQR)")]
     Payadd,
+    #[command(description = "🎁 Mời bạn bè & xem thống kê tiền thưởng")]
+    Ref,
     #[command(description = "📘 Hướng dẫn đóng HSTT, kiểm tra Quốc gia & lấy 2FA")]
     Guide,
 }
@@ -43,6 +46,9 @@ pub async fn handle_message(bot: Bot, msg: Message, state: SharedState) -> Respo
             }
             Command::Payadd => {
                 handle_payadd(&bot, msg.chat.id, telegram_id, &state).await?;
+            }
+            Command::Ref => {
+                handle_referral_menu(&bot, msg.chat.id, telegram_id, &state).await?;
             }
             Command::Guide => {
                 handle_guide(&bot, msg.chat.id, &state).await?;
@@ -71,6 +77,11 @@ pub async fn handle_message(bot: Bot, msg: Message, state: SharedState) -> Respo
         keyboards::BTN_GUIDE => {
             state.awaiting_deposit_amount.write().await.remove(&telegram_id);
             handle_guide(&bot, msg.chat.id, &state).await?;
+            return Ok(());
+        }
+        keyboards::BTN_REFERRAL => {
+            state.awaiting_deposit_amount.write().await.remove(&telegram_id);
+            handle_referral_menu(&bot, msg.chat.id, telegram_id, &state).await?;
             return Ok(());
         }
         _ => {}
@@ -196,6 +207,10 @@ pub async fn send_home_menu(
         .as_ref()
         .map(|s| s.referral_reward_vnd)
         .unwrap_or(state.config.referral_reward_vnd);
+    let referred_bonus_vnd = settings
+        .as_ref()
+        .map(|s| s.referred_bonus_vnd)
+        .unwrap_or(2_000);
     let min_first_deposit = settings
         .as_ref()
         .map(|s| s.referral_min_first_deposit_vnd)
@@ -230,6 +245,7 @@ pub async fn send_home_menu(
         balance,
         &ref_link,
         reward_vnd,
+        referred_bonus_vnd,
         min_first_deposit,
         support_handle,
     );
@@ -283,6 +299,10 @@ async fn handle_start(
         .as_ref()
         .map(|s| s.referral_reward_vnd)
         .unwrap_or(state.config.referral_reward_vnd);
+    let referred_bonus_vnd = settings
+        .as_ref()
+        .map(|s| s.referred_bonus_vnd)
+        .unwrap_or(2_000);
     let min_first_deposit = settings
         .as_ref()
         .map(|s| s.referral_min_first_deposit_vnd)
@@ -295,6 +315,7 @@ async fn handle_start(
         &full_name,
         referrer.as_ref().map(|r| r.id),
         reward_vnd,
+        referred_bonus_vnd,
     )
     .await;
 
@@ -502,6 +523,66 @@ async fn handle_guide(bot: &Bot, chat_id: ChatId, state: &SharedState) -> Respon
     bot.send_message(chat_id, text)
         .parse_mode(ParseMode::Html)
         .reply_markup(InlineKeyboardMarkup::new(rows))
+        .await?;
+
+    Ok(())
+}
+
+async fn handle_referral_menu(
+    bot: &Bot,
+    chat_id: ChatId,
+    telegram_id: i64,
+    state: &SharedState,
+) -> ResponseResult<()> {
+    let Ok(Some(user)) = user_repo::find_by_telegram_id(&state.pool, telegram_id).await else {
+        bot.send_message(chat_id, "Vui lòng gõ /start trước để khởi tạo tài khoản.")
+            .await?;
+        return Ok(());
+    };
+
+    let settings = settings_repo::get_settings(&state.pool).await.ok();
+    let reward_vnd = settings
+        .as_ref()
+        .map(|s| s.referral_reward_vnd)
+        .unwrap_or(state.config.referral_reward_vnd);
+    let referred_bonus_vnd = settings
+        .as_ref()
+        .map(|s| s.referred_bonus_vnd)
+        .unwrap_or(2_000);
+    let min_first_deposit = settings
+        .as_ref()
+        .map(|s| s.referral_min_first_deposit_vnd)
+        .unwrap_or(10_000);
+
+    let summary = match referral_service::get_referral_summary(&state.pool, user.id).await {
+        Ok(s) => s,
+        Err(err) => {
+            tracing::error!(error = ?err, "Failed to load referral summary");
+            bot.send_message(chat_id, "⚠️ Không thể tải thống kê mời bạn bè lúc này.")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    let bot_username = bot
+        .get_me()
+        .await
+        .ok()
+        .and_then(|me| me.username.clone())
+        .unwrap_or_else(|| "your_bot".to_string());
+    let ref_link = format!("https://t.me/{}?start=ref_{}", bot_username, user.ref_code);
+
+    let text = messages::referral_dashboard_message(
+        &ref_link,
+        reward_vnd,
+        referred_bonus_vnd,
+        min_first_deposit,
+        &summary,
+    );
+
+    bot.send_message(chat_id, text)
+        .parse_mode(ParseMode::Html)
+        .reply_markup(keyboards::back_to_home_keyboard())
         .await?;
 
     Ok(())

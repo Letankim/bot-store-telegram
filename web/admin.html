@@ -478,9 +478,15 @@
             </div>
 
             <div class="form-group">
-              <label><i class="bx bx-gift"></i> Tiền thưởng mời bạn bè (VND)</label>
+              <label><i class="bx bx-gift"></i> Tiền thưởng cho NGƯỜI MỜI (VND)</label>
               <input id="cfgRefReward" type="number" min="0" step="1000" placeholder="5000" />
-              <div class="form-hint">Mặc định 5.000 đ khi bạn bè nạp tiền lần đầu tiên.</div>
+              <div class="form-hint">Mặc định 5.000 đ cộng vào ví người mời khi bạn bè nạp lần đầu.</div>
+            </div>
+
+            <div class="form-group">
+              <label><i class="bx bx-party"></i> Tiền thưởng cho NGƯỜI ĐƯỢC MỜI (VND)</label>
+              <input id="cfgReferredBonus" type="number" min="0" step="1000" placeholder="2000" />
+              <div class="form-hint">Thưởng chào mừng cho bạn mới khi nạp lần đầu (đặt 0 nếu chỉ thưởng người mời).</div>
             </div>
 
             <div class="form-group">
@@ -699,12 +705,13 @@
         document.getElementById("cfgSupport").value = s.support_handle;
         document.getElementById("cfgMinDeposit").value = s.min_deposit_vnd;
         document.getElementById("cfgRefReward").value = s.referral_reward_vnd;
+        document.getElementById("cfgReferredBonus").value = s.referred_bonus_vnd;
         document.getElementById("cfgRefMinFirst").value = s.referral_min_first_deposit_vnd;
         document.getElementById("cfgQuickAmounts").value = s.quick_deposit_amounts;
 
         document.getElementById("kpiSupport").textContent = s.support_handle;
         document.getElementById("kpiMinDeposit").textContent = fmtVnd(s.min_deposit_vnd);
-        document.getElementById("kpiReferral").textContent = fmtVnd(s.referral_reward_vnd);
+        document.getElementById("kpiReferral").textContent = `${fmtVnd(s.referral_reward_vnd)} / ${fmtVnd(s.referred_bonus_vnd)}`;
         return true;
       } catch (e) {
         showToast("Không thể kết nối máy chủ!");
@@ -717,6 +724,7 @@
         support_handle: document.getElementById("cfgSupport").value.trim(),
         min_deposit_vnd: Number(document.getElementById("cfgMinDeposit").value),
         referral_reward_vnd: Number(document.getElementById("cfgRefReward").value),
+        referred_bonus_vnd: Number(document.getElementById("cfgReferredBonus").value),
         referral_min_first_deposit_vnd: Number(document.getElementById("cfgRefMinFirst").value),
         quick_deposit_amounts: document.getElementById("cfgQuickAmounts").value.trim()
       };
