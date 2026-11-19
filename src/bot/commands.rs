@@ -1,0 +1,508 @@
+use teloxide::{
+    prelude::*,
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, InputFile, ParseMode, WebAppInfo},
+    utils::command::BotCommands,
+};
+use url::Url;
+
+use crate::{
+    bot::{keyboards, messages},
+    domain::wallet::format_vnd,
+    repo::{activation_repo, plan_repo, settings_repo, user_repo, wallet_repo},
+    state::SharedState,
+};
+
+#[derive(BotCommands, Clone, Debug)]
+#[command(rename_rule = "lowercase", description = "Danh sách lệnh hỗ trợ:")]
+pub enum Command {
+    #[command(description = "▶️ Xem menu chính")]
+    Start(String),
+    #[command(description = "🤖 Kích hoạt Gemini Pro chính chủ")]
+    Pixel,
+    #[command(description = "💳 Nạp tiền tự động qua ngân hàng (VietQR)")]
+    Payadd,
+    #[command(description = "📘 Hướng dẫn đóng HSTT, kiểm tra Quốc gia & lấy 2FA")]
+    Guide,
+}
+
+pub async fn handle_message(bot: Bot, msg: Message, state: SharedState) -> ResponseResult<()> {
+    let Some(from) = msg.from.as_ref() else {
+        return Ok(());
+    };
+    let telegram_id = from.id.0 as i64;
+    let text = msg.text().unwrap_or("").trim();
+
+    if let Ok(cmd) = Command::parse(text, "") {
+        state.awaiting_deposit_amount.write().await.remove(&telegram_id);
+        match cmd {
+            Command::Start(start_arg) => {
+                handle_start(&bot, &msg, from, start_arg.trim(), &state).await?;
+            }
+            Command::Pixel => {
+                handle_show_plans(&bot, msg.chat.id, &state).await?;
+            }
+            Command::Payadd => {
+                handle_payadd(&bot, msg.chat.id, telegram_id, &state).await?;
+            }
+            Command::Guide => {
+                handle_guide(&bot, msg.chat.id, &state).await?;
+            }
+        }
+        return Ok(());
+    }
+
+    // Handle Reply Keyboard button taps
+    match text {
+        keyboards::BTN_GEMINI_PRO => {
+            state.awaiting_deposit_amount.write().await.remove(&telegram_id);
+            handle_show_plans(&bot, msg.chat.id, &state).await?;
+            return Ok(());
+        }
+        keyboards::BTN_WALLET => {
+            state.awaiting_deposit_amount.write().await.remove(&telegram_id);
+            handle_payadd(&bot, msg.chat.id, telegram_id, &state).await?;
+            return Ok(());
+        }
+        keyboards::BTN_ORDERS => {
+            state.awaiting_deposit_amount.write().await.remove(&telegram_id);
+            handle_my_orders(&bot, msg.chat.id, telegram_id, &state).await?;
+            return Ok(());
+        }
+        keyboards::BTN_GUIDE => {
+            state.awaiting_deposit_amount.write().await.remove(&telegram_id);
+            handle_guide(&bot, msg.chat.id, &state).await?;
+            return Ok(());
+        }
+        _ => {}
+    }
+
+    // Check if user is entering a custom deposit amount
+    let is_awaiting = state
+        .awaiting_deposit_amount
+        .read()
+        .await
+        .contains(&telegram_id);
+
+    if is_awaiting {
+        let digits_only: String = text.chars().filter(|c| c.is_ascii_digit()).collect();
+        let Ok(amount_vnd) = digits_only.parse::<i64>() else {
+            bot.send_message(
+                msg.chat.id,
+                "⚠️ Số tiền không hợp lệ. Vui lòng chỉ nhập số (ví dụ: <code>50000</code> hoặc <code>100000</code>):",
+            )
+            .parse_mode(ParseMode::Html)
+            .reply_markup(keyboards::back_to_home_keyboard())
+            .await?;
+            return Ok(());
+        };
+
+        let min_deposit = settings_repo::get_settings(&state.pool)
+            .await
+            .map(|s| s.min_deposit_vnd)
+            .unwrap_or(10_000);
+
+        if amount_vnd < min_deposit {
+            bot.send_message(
+                msg.chat.id,
+                format!(
+                    "⚠️ Số tiền nạp tối thiểu mỗi lần là <b>{} đ</b>. Vui lòng nhập số tiền lớn hơn hoặc bằng {} đ:",
+                    format_vnd(min_deposit),
+                    format_vnd(min_deposit)
+                ),
+            )
+            .parse_mode(ParseMode::Html)
+            .reply_markup(keyboards::back_to_home_keyboard())
+            .await?;
+            return Ok(());
+        }
+
+        state.awaiting_deposit_amount.write().await.remove(&telegram_id);
+        send_vietqr_deposit_photo(&bot, msg.chat.id, telegram_id, amount_vnd, &state).await?;
+    }
+
+    Ok(())
+}
+
+/// Helper: Create VietQR payment and send the QR image directly inside Telegram chat.
+pub async fn send_vietqr_deposit_photo(
+    bot: &Bot,
+    chat_id: ChatId,
+    telegram_id: i64,
+    amount_vnd: i64,
+    state: &SharedState,
+) -> ResponseResult<()> {
+    let Ok(Some(user)) = user_repo::find_by_telegram_id(&state.pool, telegram_id).await else {
+        bot.send_message(chat_id, "⚠️ Vui lòng bấm /start trước để khởi tạo ví.")
+            .await?;
+        return Ok(());
+    };
+
+    match state.payos_service.create_topup_link(user.id, amount_vnd).await {
+        Ok(created) => {
+            let caption = messages::vietqr_photo_caption(
+                created.deposit.order_code,
+                created.deposit.amount_vnd,
+                &created.deposit.description,
+                created.account_number.as_deref(),
+                created.account_name.as_deref(),
+            );
+            let encoded_qr: String =
+                url::form_urlencoded::byte_serialize(created.qr_code.as_bytes()).collect();
+            let qr_image_url = format!(
+                "https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=16&data={encoded_qr}"
+            );
+
+            let kb = keyboards::vietqr_payment_actions_keyboard(created.deposit.order_code);
+            if let Ok(parsed_url) = Url::parse(&qr_image_url) {
+                let photo_res = bot
+                    .send_photo(chat_id, InputFile::url(parsed_url))
+                    .caption(caption.clone())
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(kb.clone())
+                    .await;
+
+                if photo_res.is_ok() {
+                    return Ok(());
+                }
+            }
+
+            // Fallback to text if photo send fails
+            bot.send_message(chat_id, caption)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(kb)
+                .await?;
+        }
+        Err(err) => {
+            tracing::error!(error = ?err, "Failed to create VietQR topup link");
+            bot.send_message(chat_id, format!("⚠️ Không thể tạo mã nạp tiền lúc này: {err}"))
+                .reply_markup(keyboards::back_to_home_keyboard())
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Reusable home menu screen (used by `/start` and `back:home`).
+pub async fn send_home_menu(
+    bot: &Bot,
+    chat_id: ChatId,
+    telegram_id: i64,
+    fallback_name: &str,
+    state: &SharedState,
+) -> ResponseResult<()> {
+    let settings = settings_repo::get_settings(&state.pool).await.ok();
+    let reward_vnd = settings
+        .as_ref()
+        .map(|s| s.referral_reward_vnd)
+        .unwrap_or(state.config.referral_reward_vnd);
+    let min_first_deposit = settings
+        .as_ref()
+        .map(|s| s.referral_min_first_deposit_vnd)
+        .unwrap_or(10_000);
+    let support_handle = settings
+        .as_ref()
+        .map(|s| s.support_handle.as_str())
+        .unwrap_or(state.config.support_handle.as_str());
+
+    let (full_name, ref_code, balance) =
+        match user_repo::find_by_telegram_id(&state.pool, telegram_id).await {
+            Ok(Some(user)) => {
+                let bal = wallet_repo::get_by_user_id(&state.pool, user.id)
+                    .await
+                    .map(|w| w.balance_vnd)
+                    .unwrap_or(0);
+                (user.full_name, user.ref_code, bal)
+            }
+            _ => (fallback_name.to_string(), "START".to_string(), 0),
+        };
+
+    let bot_username = bot
+        .get_me()
+        .await
+        .ok()
+        .and_then(|me| me.username.clone())
+        .unwrap_or_else(|| "your_bot".to_string());
+    let ref_link = format!("https://t.me/{}?start=ref_{}", bot_username, ref_code);
+
+    let text = messages::welcome_message(
+        &full_name,
+        balance,
+        &ref_link,
+        reward_vnd,
+        min_first_deposit,
+        support_handle,
+    );
+
+    bot.send_message(chat_id, text)
+        .parse_mode(ParseMode::Html)
+        .reply_markup(keyboards::main_reply_keyboard())
+        .await?;
+
+    Ok(())
+}
+
+async fn handle_start(
+    bot: &Bot,
+    msg: &Message,
+    from: &teloxide::types::User,
+    start_arg: &str,
+    state: &SharedState,
+) -> ResponseResult<()> {
+    let telegram_id = from.id.0 as i64;
+    let full_name = match &from.last_name {
+        Some(last) if !last.is_empty() => format!("{} {}", from.first_name, last),
+        _ => from.first_name.clone(),
+    };
+
+    let ref_code_opt = start_arg
+        .strip_prefix("ref_")
+        .or(if !start_arg.is_empty() {
+            Some(start_arg)
+        } else {
+            None
+        });
+
+    let mut referrer = None;
+    if let Some(code) = ref_code_opt {
+        if let Ok(Some(found)) = user_repo::find_by_ref_code(&state.pool, code).await {
+            if found.telegram_id != telegram_id {
+                referrer = Some(found);
+            }
+        }
+    }
+
+    let Ok(mut tx) = state.pool.begin().await else {
+        bot.send_message(msg.chat.id, "⚠️ Hệ thống đang bận, vui lòng thử lại sau.")
+            .await?;
+        return Ok(());
+    };
+
+    let settings = settings_repo::get_settings(&state.pool).await.ok();
+    let reward_vnd = settings
+        .as_ref()
+        .map(|s| s.referral_reward_vnd)
+        .unwrap_or(state.config.referral_reward_vnd);
+    let min_first_deposit = settings
+        .as_ref()
+        .map(|s| s.referral_min_first_deposit_vnd)
+        .unwrap_or(10_000);
+
+    let ensured = user_repo::ensure_user_with_wallet(
+        &mut tx,
+        telegram_id,
+        from.username.as_deref(),
+        &full_name,
+        referrer.as_ref().map(|r| r.id),
+        reward_vnd,
+    )
+    .await;
+
+    let (user, is_new) = match ensured {
+        Ok(pair) => {
+            if tx.commit().await.is_err() {
+                bot.send_message(msg.chat.id, "⚠️ Lỗi lưu dữ liệu, vui lòng thử lại.")
+                    .await?;
+                return Ok(());
+            }
+            pair
+        }
+        Err(err) => {
+            tracing::error!(error = ?err, "Failed to ensure user on /start");
+            bot.send_message(msg.chat.id, "⚠️ Không thể khởi tạo tài khoản, vui lòng thử lại.")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    if is_new {
+        if let Some(ref_user) = referrer {
+            let notice = messages::referral_joined_notification(
+                &user.full_name,
+                reward_vnd,
+                min_first_deposit,
+            );
+            let _ = bot
+                .send_message(ChatId(ref_user.telegram_id), notice)
+                .parse_mode(ParseMode::Html)
+                .await;
+        }
+    }
+
+    send_home_menu(bot, msg.chat.id, telegram_id, &full_name, state).await
+}
+
+pub async fn handle_show_plans(
+    bot: &Bot,
+    chat_id: ChatId,
+    state: &SharedState,
+) -> ResponseResult<()> {
+    let plans = match plan_repo::list_active_plans(&state.pool).await {
+        Ok(p) => p,
+        Err(err) => {
+            tracing::error!(error = ?err, "Failed to list plans");
+            bot.send_message(chat_id, "⚠️ Không thể tải danh sách gói Gemini Pro.")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    if plans.is_empty() {
+        bot.send_message(chat_id, "Hiện chưa có gói kích hoạt Gemini Pro nào đang mở bán.")
+            .reply_markup(keyboards::back_to_home_keyboard())
+            .await?;
+        return Ok(());
+    }
+
+    if plans.len() == 1 {
+        let plan = &plans[0];
+        let pid = plan.id.to_string();
+        let guide_url = state.config.guide_url(Some(&pid));
+        let support_handle = settings_repo::get_settings(&state.pool)
+            .await
+            .map(|s| s.support_handle)
+            .unwrap_or_else(|_| state.config.support_handle.clone());
+        let card = messages::gemini_plan_card(plan, &guide_url, &support_handle);
+        bot.send_message(chat_id, card)
+            .parse_mode(ParseMode::Html)
+            .reply_markup(keyboards::plan_detail_keyboard(&pid, &guide_url))
+            .await?;
+    } else {
+        bot.send_message(
+            chat_id,
+            "🤖 <b>Chọn gói Kích Hoạt Gemini Pro Chính Chủ (Your Mail) bên dưới:</b>",
+        )
+        .parse_mode(ParseMode::Html)
+        .reply_markup(keyboards::plan_selector_keyboard(&plans))
+        .await?;
+    }
+
+    Ok(())
+}
+
+pub async fn handle_payadd(
+    bot: &Bot,
+    chat_id: ChatId,
+    telegram_id: i64,
+    state: &SharedState,
+) -> ResponseResult<()> {
+    let balance = match user_repo::find_by_telegram_id(&state.pool, telegram_id).await {
+        Ok(Some(user)) => wallet_repo::get_by_user_id(&state.pool, user.id)
+            .await
+            .map(|w| w.balance_vnd)
+            .unwrap_or(0),
+        _ => 0,
+    };
+
+    let settings = settings_repo::get_settings(&state.pool).await.ok();
+    let min_deposit = settings.as_ref().map(|s| s.min_deposit_vnd).unwrap_or(10_000);
+    let quick_amounts = settings
+        .as_ref()
+        .map(|s| s.parsed_quick_amounts())
+        .unwrap_or_else(|| vec![40_000, 80_000, 150_000, 300_000]);
+
+    let msg = format!(
+        "💰 <b>Ví Của Bạn</b>\n\
+         • Số dư khả dụng: <b>{} đ</b>\n\
+         • Nạp tối thiểu mỗi lần: <b>{} đ</b>\n\n\
+         💳 <b>Nạp tiền tự động qua Chuyển khoản Ngân hàng (VietQR 24/7)</b>\n\
+         Chọn mệnh giá nạp nhanh hoặc bấm <b>✏️ Nhập số tiền khác</b> bên dưới:",
+        format_vnd(balance),
+        format_vnd(min_deposit),
+    );
+
+    bot.send_message(chat_id, msg)
+        .parse_mode(ParseMode::Html)
+        .reply_markup(keyboards::payos_amount_keyboard(None, min_deposit, &quick_amounts))
+        .await?;
+
+    Ok(())
+}
+
+async fn handle_my_orders(
+    bot: &Bot,
+    chat_id: ChatId,
+    telegram_id: i64,
+    state: &SharedState,
+) -> ResponseResult<()> {
+    let Ok(Some(user)) = user_repo::find_by_telegram_id(&state.pool, telegram_id).await else {
+        bot.send_message(chat_id, "Vui lòng gõ /start trước để khởi tạo tài khoản.")
+            .await?;
+        return Ok(());
+    };
+
+    let orders = activation_repo::list_by_user(&state.pool, user.id, 10)
+        .await
+        .unwrap_or_default();
+
+    if orders.is_empty() {
+        bot.send_message(
+            chat_id,
+            "📦 Bạn chưa có đơn kích hoạt Gemini Pro nào. Gõ /pixel để đặt đơn ngay!",
+        )
+        .reply_markup(keyboards::back_to_home_keyboard())
+        .await?;
+        return Ok(());
+    }
+
+    let mut lines = vec!["📦 <b>10 Đơn Kích Hoạt Gần Nhất:</b>\n".to_string()];
+    for o in orders {
+        let icon = match o.status.as_str() {
+            "COMPLETED" => "✅",
+            "REFUNDED" => "↩️",
+            "PROCESSING" => "⚙️",
+            _ => "⏳",
+        };
+        lines.push(format!(
+            "{} <code>{}</code> | {} | <b>{} đ</b> | <i>{}</i>",
+            icon,
+            o.order_code,
+            messages::escape_html(&o.gmail_masked),
+            format_vnd(o.price_paid_vnd),
+            o.status
+        ));
+    }
+
+    bot.send_message(chat_id, lines.join("\n"))
+        .parse_mode(ParseMode::Html)
+        .reply_markup(keyboards::back_to_home_keyboard())
+        .await?;
+
+    Ok(())
+}
+
+async fn handle_guide(bot: &Bot, chat_id: ChatId, state: &SharedState) -> ResponseResult<()> {
+    let guide_url = state.config.guide_url(None);
+    let mut rows = Vec::new();
+    if let Ok(url) = Url::parse(&guide_url) {
+        if url.scheme() == "https" {
+            rows.push(vec![InlineKeyboardButton::web_app(
+                "📘 Mở Trang Hướng Dẫn 4 Bước (Interactive)",
+                WebAppInfo { url },
+            )]);
+        } else {
+            rows.push(vec![InlineKeyboardButton::url(
+                "📘 Mở Trang Hướng Dẫn 4 Bước",
+                url,
+            )]);
+        }
+    }
+    rows.push(vec![InlineKeyboardButton::callback(
+        "⬅️ Quay lại Menu chính",
+        "back:home",
+    )]);
+
+    let text = "📘 <b>Trang Hướng Dẫn Chuẩn Bị Gmail Trước Khi Kích Hoạt Gemini Pro</b>\n\n\
+        1️⃣ Kiểm tra Quốc gia Gmail (Việt Nam)\n\
+        2️⃣ Kiểm tra tài khoản trắng &amp; Rời nhóm Google Family\n\
+        3️⃣ Đóng Hồ Sơ Thanh Toán (HSTT) Google Pay\n\
+        4️⃣ Bật Xác minh 2 bước &amp; Lấy mã khóa 2FA 32 ký tự (kèm công cụ kiểm tra mã 6 số trực tiếp)\n\n\
+        👇 Bấm nút bên dưới để mở Trang Hướng Dẫn:";
+
+    bot.send_message(chat_id, text)
+        .parse_mode(ParseMode::Html)
+        .reply_markup(InlineKeyboardMarkup::new(rows))
+        .await?;
+
+    Ok(())
+}

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Hướng Dẫn Chuẩn Bị Gmail & Lấy Mã 2FA — Gemini Pro</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #0f172a);
+      --card: var(--tg-theme-secondary-bg-color, #1e293b);
+      --text: var(--tg-theme-text-color, #f8fafc);
+      --muted: var(--tg-theme-hint-color, #94a3b8);
+      --accent: var(--tg-theme-button-color, #3b82f6);
+      --accent-text: var(--tg-theme-button-text-color, #ffffff);
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --border: rgba(148, 163, 184, 0.2);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      padding: 16px 14px 90px;
+    }
+    .container { max-width: 640px; margin: 0 auto; }
+    .hero {
+      background: linear-gradient(135deg, rgba(59,130,246,0.22), rgba(16,185,129,0.16));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      margin-bottom: 16px;
+    }
+    .hero h1 { font-size: 1.25rem; margin-bottom: 6px; }
+    .hero p { font-size: 0.9rem; color: var(--muted); }
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      background: rgba(59,130,246,0.2);
+      color: #60a5fa;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .step-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .step-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .step-num {
+      width: 30px;
+      height: 30px;
+      border-radius: 10px;
+      background: var(--accent);
+      color: var(--accent-text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.95rem;
+      flex-shrink: 0;
+    }
+    .step-title { font-size: 1.02rem; font-weight: 700; }
+    .step-body { font-size: 0.9rem; color: var(--text); }
+    .step-body ol, .step-body ul { padding-left: 20px; margin: 8px 0; }
+    .step-body li { margin-bottom: 6px; }
+    .callout {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      border-left: 3px solid var(--warn);
+      background: rgba(245, 158, 11, 0.12);
+    }
+    .callout.ok {
+      border-left-color: var(--ok);
+      background: rgba(16, 185, 129, 0.12);
+    }
+    .callout.danger {
+      border-left-color: var(--danger);
+      background: rgba(239, 68, 68, 0.12);
+    }
+    .code-box {
+      margin-top: 8px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px dashed var(--border);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.84rem;
+      word-break: break-all;
+      color: #38bdf8;
+    }
+    .btn-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      margin-top: 10px;
+      padding: 11px 14px;
+      border-radius: 11px;
+      background: var(--accent);
+      color: var(--accent-text);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-secondary {
+      background: rgba(148, 163, 184, 0.16);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .tester {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid var(--border);
+    }
+    .tester input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.88rem;
+      margin-top: 6px;
+    }
+    .otp-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 9px;
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+    .otp-code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      color: #34d399;
+    }
+    .sticky-footer {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 12px 14px;
+      background: var(--bg);
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: center;
+    }
+    .sticky-footer .btn-link {
+      max-width: 640px;
+      margin-top: 0;
+      background: linear-gradient(135deg, #2563eb, #10b981);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <span class="badge">Hướng dẫn chuẩn bị tài khoản</span>
+      <h1>📘 Hướng Dẫn Kích Hoạt Gemini Pro Chính Chủ</h1>
+      <p>Vui lòng thực hiện đủ <strong>4 bước bên dưới</strong> trước khi gửi đơn để đảm bảo đơn của bạn được kích hoạt thành công nhanh nhất (1–6 giờ) và không bị lỗi hoàn đơn.</p>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-num">1</div>
+        <div class="step-title">Kiểm tra Quốc gia Gmail (Bắt buộc Việt Nam)</div>
+      </div>
+      <div class="step-body">
+        <p>Gói kích hoạt chính chủ chỉ hỗ trợ <strong>Gmail Quốc gia Việt Nam</strong> (nếu mail quốc gia khác sẽ cần tự kích hoạt qua thẻ Visa 0đ).</p>
+        <ol>
+          <li>Đăng nhập đúng Gmail cần nâng cấp trên trình duyệt.</li>
+          <li>Bấm nút bên dưới để mở trang Điều khoản Dịch vụ Google.</li>
+          <li>Nhìn ngay dưới dòng tiêu đề <strong>Điều khoản dịch vụ (Terms of Service)</strong> sẽ thấy dòng <strong>Phiên bản quốc gia (Country version)</strong>.</li>
+        </ol>
+        <div class="callout ok">
+          ✅ Hợp lệ khi hiển thị: <strong>Phiên bản quốc gia: Việt Nam</strong>.
+        </div>
+        <a class="btn-link" href="https://policies.google.com/terms" target="_blank" rel="noopener">
+          🌐 Mở trang Kiểm tra Quốc gia Gmail
+        </a>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-num">2</div>
+        <div class="step-title">Kiểm tra Gmail trắng &amp; Rời Nhóm Gia Đình (Family)</div>
+      </div>
+      <div class="step-body">
+        <p>Gmail cần nâng cấp phải là <strong>tài khoản trắng</strong>: chưa đăng ký gói Google One / Gemini Pro / Pixel nào trước đó và <strong>không nằm trong nhóm Google Family</strong>.</p>
+        <ol>
+          <li>Mở trang Quản lý Nhóm gia đình của Google bên dưới.</li>
+          <li>Nếu thấy mình đang ở trong 1 nhóm gia đình nào đó, hãy bấm <strong>Rời khỏi nhóm gia đình (Leave family group)</strong>.</li>
+        </ol>
+        <a class="btn-link btn-secondary" href="https://myaccount.google.com/family/details" target="_blank" rel="noopener">
+          👨‍👩‍👧‍👦 Kiểm tra Google Family
+        </a>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-num">3</div>
+        <div class="step-title">Đóng Hồ Sơ Thanh Toán (HSTT) Google Pay</div>
+      </div>
+      <div class="step-body">
+        <p>Nếu Gmail của bạn từng tạo Hồ sơ thanh toán (mua app CH Play, thêm thẻ, hoặc nhận gói cũ), bắt buộc phải <strong>Đóng HSTT</strong>:</p>
+        <ol>
+          <li>Mở trang <strong>Cài đặt Google Pay</strong> bằng nút bên dưới.</li>
+          <li>Kéo xuống dưới cùng tới mục <strong>Trạng thái hồ sơ thanh toán (Payments profile status)</strong>.</li>
+          <li>Bấm <strong>Đóng hồ sơ thanh toán (Close payments profile)</strong> $\rightarrow$ Nhập mật khẩu xác nhận $\rightarrow$ Chọn lý do bất kỳ và bấm Đóng.</li>
+        </ol>
+        <div class="callout">
+          💡 Nếu mở trang lên thấy màn hình trắng / báo chưa có hồ sơ thanh toán thì tức là Gmail của bạn đã sạch, có thể bỏ qua bước này!
+        </div>
+        <a class="btn-link" href="https://pay.google.com/gp/w/u/0/home/settings" target="_blank" rel="noopener">
+          💳 Mở Cài đặt Hồ Sơ Thanh Toán (HSTT)
+        </a>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-num">4</div>
+        <div class="step-title">Bật Xác minh 2 bước &amp; Lấy Mã Khóa 2FA (32 ký tự)</div>
+      </div>
+      <div class="step-body">
+        <p>Hệ thống cần mã khóa thiết lập 2FA (chuỗi 32 ký tự) để đăng nhập kích hoạt tự động không bị Google hỏi xác minh trên điện thoại.</p>
+        <ol>
+          <li>Mở trang <strong>Xác minh 2 bước (2-Step Verification)</strong> của Google bằng nút bên dưới và bật lên (nếu chưa bật).</li>
+          <li>Kéo xuống chọn mục <strong>Ứng dụng xác thực (Authenticator)</strong> $\rightarrow$ bấm <strong>Thiết lập ứng dụng xác thực (Set up authenticator)</strong>.</li>
+          <li>Khi hiện ra mã QR, <strong>KHÔNG quét mã</strong> mà bấm vào dòng chữ xanh <strong>"Không thể quét mã?" (Can't scan it?)</strong> ngay bên dưới mã QR.</li>
+          <li>Copy toàn bộ chuỗi <strong>32 ký tự</strong> hiện ra (có dạng như mẫu bên dưới).</li>
+          <li>Bấm <strong>Tiếp theo (Next)</strong> trên Google, lấy mã 6 số từ bộ kiểm tra bên dưới (hoặc App Authenticator của bạn) điền vào Google để bấm <strong>Xác minh (Verify)</strong> hoàn tất!</li>
+        </ol>
+        <div class="code-box">
+          Mẫu chuỗi 2FA chuẩn:<br/>
+          <strong>ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl</strong>
+        </div>
+        <div class="callout danger">
+          ⚠️ <strong>Tuyệt đối không gửi mã 6 số nhất thời</strong> (hết hạn sau 30 giây) hoặc <strong>mã dự phòng 8 số</strong>. Hãy gửi đúng <strong>chuỗi 32 ký tự chữ + số</strong> ở bước "Không thể quét mã?".
+        </div>
+        <a class="btn-link" href="https://myaccount.google.com/signinoptions/two-step-verification" target="_blank" rel="noopener">
+          🔐 Mở Cài đặt 2FA (Authenticator) của Google
+        </a>
+
+        <div class="tester">
+          <div style="font-size:0.85rem;font-weight:700;">🧪 Công cụ Kiểm tra &amp; Lấy mã 6 số từ chuỗi 2FA 32 ký tự</div>
+          <input id="test2fa" type="text" placeholder="Dán chuỗi 32 ký tự của bạn vào đây để lấy mã 6 số..." />
+          <div id="otpResult" class="otp-row" style="display:none;">
+            <div>
+              <div style="font-size:0.75rem;color:var(--muted);">Mã 6 số hiện tại (dùng để bấm Verify trên Google)</div>
+              <div id="otpDigits" class="otp-code">------</div>
+            </div>
+            <div id="otpTimer" style="font-weight:700;font-size:0.9rem;color:#34d399;">30s</div>
+          </div>
+          <div id="otpErr" style="display:none;color:#f87171;font-size:0.8rem;margin-top:6px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORMAT SUMMARY -->
+    <div class="step-card">
+      <div class="step-header">
+        <div class="step-num">✓</div>
+        <div class="step-title">Định dạng thông tin chuẩn sẽ gửi ở Form</div>
+      </div>
+      <div class="step-body">
+        <p>Khi điền vào Form kích hoạt, hệ thống sẽ tự động ghép và mã hóa AES-256-GCM theo đúng định dạng chuẩn:</p>
+        <div class="code-box">customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="sticky-footer">
+    <a id="goActivateBtn" class="btn-link" href="/webapp/activate">
+      🚀 Đã xong 4 bước — Mở Form Điền Thông Tin Ngay
+    </a>
+  </div>
+
+  <script>
+    if (window.Telegram && window.Telegram.WebApp) {
+      window.Telegram.WebApp.ready();
+      window.Telegram.WebApp.expand();
+    }
+
+    // Preserve plan_id query parameter when jumping to /webapp/activate
+    const params = new URLSearchParams(window.location.search);
+    const planId = params.get("plan_id");
+    if (planId) {
+      document.getElementById("goActivateBtn").href = "/webapp/activate?plan_id=" + encodeURIComponent(planId);
+    }
+
+    // Pure WebCrypto Base32 -> TOTP (RFC 6238) generator
+    function base32ToBytes(input) {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      const clean = input.toUpperCase().replace(/[^A-Z2-7]/g, "");
+      if (clean.length < 16) return null;
+      let bits = "";
+      for (const ch of clean) {
+        const idx = alphabet.indexOf(ch);
+        if (idx === -1) return null;
+        bits += idx.toString(2).padStart(5, "0");
+      }
+      const bytes = new Uint8Array(Math.floor(bits.length / 8));
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+      }
+      return bytes;
+    }
+
+    async function computeTotp(secret) {
+      const keyBytes = base32ToBytes(secret);
+      if (!keyBytes) return null;
+      const counter = Math.floor(Date.now() / 1000 / 30);
+      const buf = new ArrayBuffer(8);
+      const view = new DataView(buf);
+      view.setUint32(0, Math.floor(counter / 0x100000000), false);
+      view.setUint32(4, counter >>> 0, false);
+
+      const cryptoKey = await crypto.subtle.importKey(
+        "raw", keyBytes, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
+      );
+      const sig = new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, buf));
+      const offset = sig[sig.length - 1] & 0x0f;
+      const bin = ((sig[offset] & 0x7f) << 24)
+        | ((sig[offset + 1] & 0xff) << 16)
+        | ((sig[offset + 2] & 0xff) << 8)
+        | (sig[offset + 3] & 0xff);
+      return String(bin % 1000000).padStart(6, "0");
+    }
+
+    const input2fa = document.getElementById("test2fa");
+    const otpResult = document.getElementById("otpResult");
+    const otpDigits = document.getElementById("otpDigits");
+    const otpTimer = document.getElementById("otpTimer");
+    const otpErr = document.getElementById("otpErr");
+
+    async function refreshOtp() {
+      const val = input2fa.value.trim();
+      if (!val) {
+        otpResult.style.display = "none";
+        otpErr.style.display = "none";
+        return;
+      }
+      const code = await computeTotp(val);
+      if (!code) {
+        otpResult.style.display = "none";
+        otpErr.textContent = "Chuỗi 2FA chưa hợp lệ (phải gồm ít nhất 16-32 ký tự chữ a-z và số 2-7).";
+        otpErr.style.display = "block";
+        return;
+      }
+      otpErr.style.display = "none";
+      otpResult.style.display = "flex";
+      otpDigits.textContent = code.slice(0, 3) + " " + code.slice(3);
+      const rem = 30 - (Math.floor(Date.now() / 1000) % 30);
+      otpTimer.textContent = rem + "s";
+    }
+
+    input2fa.addEventListener("input", refreshOtp);
+    setInterval(refreshOtp, 1000);
+  </script>
+</body>
+</html>

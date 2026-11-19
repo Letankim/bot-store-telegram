@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Form Kích Hoạt Gemini Pro — Mail | Pass | 2FA</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #0f172a);
+      --card: var(--tg-theme-secondary-bg-color, #1e293b);
+      --text: var(--tg-theme-text-color, #f8fafc);
+      --muted: var(--tg-theme-hint-color, #94a3b8);
+      --accent: var(--tg-theme-button-color, #3b82f6);
+      --accent-text: var(--tg-theme-button-text-color, #ffffff);
+      --ok: #10b981;
+      --warn: #f59e0b;
+      --danger: #ef4444;
+      --border: rgba(148, 163, 184, 0.22);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 14px 14px 36px;
+    }
+    .container { max-width: 560px; margin: 0 auto; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
+    }
+    .plan-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .plan-title { font-size: 1.05rem; font-weight: 700; }
+    .price-pill {
+      background: rgba(16, 185, 129, 0.18);
+      color: #34d399;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 800;
+      font-size: 0.9rem;
+      white-space: nowrap;
+    }
+    .wallet-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.22);
+      font-size: 0.88rem;
+    }
+    .guide-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(16,185,129,0.14));
+      border: 1px solid rgba(59,130,246,0.35);
+      margin-bottom: 14px;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .field { margin-bottom: 14px; }
+    .field-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.86rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .help-tag {
+      font-size: 0.76rem;
+      color: #60a5fa;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .input-wrap { position: relative; }
+    input[type="text"], input[type="email"], input[type="password"], textarea {
+      width: 100%;
+      padding: 11px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.92rem;
+      outline: none;
+    }
+    input:focus, textarea:focus { border-color: var(--accent); }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .toggle-pass {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+    .hint-box {
+      display: none;
+      margin-top: 6px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(59,130,246,0.12);
+      border-left: 3px solid var(--accent);
+      font-size: 0.8rem;
+      color: var(--text);
+    }
+    .hint-box.show { display: block; }
+    .otp-live {
+      display: none;
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 10px;
+      background: rgba(16, 185, 129, 0.14);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.84rem;
+    }
+    .otp-live strong {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 1.1rem;
+      color: #34d399;
+      letter-spacing: 0.1em;
+    }
+    .preview-box {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.28);
+      border: 1px dashed var(--border);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      word-break: break-all;
+      min-height: 44px;
+    }
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      font-size: 0.84rem;
+      margin-bottom: 10px;
+      cursor: pointer;
+    }
+    .check-item input { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+    .btn-submit {
+      width: 100%;
+      padding: 13px 16px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #2563eb, #10b981);
+      color: #ffffff;
+      font-size: 0.96rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .btn-submit:disabled { opacity: 0.45; cursor: not-allowed; }
+    .alert {
+      display: none;
+      padding: 12px;
+      border-radius: 12px;
+      font-size: 0.86rem;
+      margin-bottom: 12px;
+    }
+    .alert.error {
+      display: block;
+      background: rgba(239, 68, 68, 0.16);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #fca5a5;
+    }
+    .alert.success {
+      display: block;
+      background: rgba(16, 185, 129, 0.16);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      color: #6ee7b7;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="alertBox" class="alert"></div>
+
+    <!-- Plan & Wallet Summary -->
+    <div class="card">
+      <div class="plan-header">
+        <div>
+          <div style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;font-weight:700;">Dịch vụ kích hoạt chính chủ</div>
+          <div id="planName" class="plan-title">Đang tải thông tin gói...</div>
+        </div>
+        <div id="planPrice" class="price-pill">--- đ</div>
+      </div>
+      <div class="wallet-bar">
+        <span>💰 Số dư ví của bạn: <strong id="walletBalance">--- đ</strong></span>
+        <span id="balanceStatus" style="font-weight:700;">...</span>
+      </div>
+    </div>
+
+    <!-- Link to Full Guide Page -->
+    <a id="guideLink" class="guide-banner" href="/webapp/guide">
+      <div>
+        <div style="font-weight:700;font-size:0.92rem;">📘 Chưa biết đóng HSTT / lấy mã 2FA?</div>
+        <div style="font-size:0.78rem;color:var(--muted);">Xem Trang Hướng Dẫn 4 bước cầm tay chỉ việc tại đây</div>
+      </div>
+      <span style="font-size:1.2rem;">➡️</span>
+    </a>
+
+    <!-- Main Form -->
+    <form id="activationForm" class="card">
+      <div class="field">
+        <div class="field-label">
+          <span>⚡ Dán nhanh (Tùy chọn)</span>
+          <span style="font-size:0.75rem;color:var(--muted);">Tự động tách 3 ô</span>
+        </div>
+        <input id="quickPaste" class="mono" type="text" placeholder="customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5..." />
+      </div>
+
+      <hr style="border:none;border-top:1px solid var(--border);margin:12px 0 14px;" />
+
+      <!-- Email -->
+      <div class="field">
+        <div class="field-label">
+          <span>1. Địa chỉ Gmail *</span>
+          <span class="help-tag" onclick="toggleHint('hintEmail')">Hướng dẫn kiểm tra</span>
+        </div>
+        <input id="email" type="email" required placeholder="customer1@gmail.com" autocomplete="off" />
+        <div id="hintEmail" class="hint-box">
+          • Chỉ nhận <strong>Gmail Quốc gia Việt Nam</strong> (kiểm tra tại <a href="https://policies.google.com/terms" target="_blank" style="color:#60a5fa;">policies.google.com/terms</a>).<br/>
+          • Phải là tài khoản trắng, không ở trong Google Family và đã đóng HSTT cũ.
+        </div>
+      </div>
+
+      <!-- Password -->
+      <div class="field">
+        <div class="field-label">
+          <span>2. Mật khẩu Gmail *</span>
+          <span class="help-tag" onclick="toggleHint('hintPass')">Lưu ý</span>
+        </div>
+        <div class="input-wrap">
+          <input id="password" type="password" required placeholder="abcxyz" autocomplete="off" />
+          <button type="button" class="toggle-pass" onclick="togglePassword()">Hiện</button>
+        </div>
+        <div id="hintPass" class="hint-box">
+          • Nhập chính xác mật khẩu hiện tại (phân biệt chữ hoa/thường).<br/>
+          • Dữ liệu được mã hóa <strong>AES-256-GCM</strong> ngay khi gửi lên máy chủ.
+        </div>
+      </div>
+
+      <!-- 2FA Secret -->
+      <div class="field">
+        <div class="field-label">
+          <span>3. Mã khóa 2FA (32 ký tự) *</span>
+          <span class="help-tag" onclick="toggleHint('hint2fa')">Lấy mã này ở đâu?</span>
+        </div>
+        <input id="twoFa" class="mono" type="text" required placeholder="ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl" autocomplete="off" />
+        <div id="hint2fa" class="hint-box">
+          • Vào Google 2FA $\rightarrow$ Ứng dụng xác thực $\rightarrow$ Thiết lập $\rightarrow$ bấm <strong>"Không thể quét mã?"</strong> để copy chuỗi 32 ký tự.<br/>
+          • Không điền mã 6 số nhất thời!
+        </div>
+        <div id="otpLive" class="otp-live">
+          <span>✅ Mã 2FA hợp lệ! OTP 6 số hiện tại: <strong id="otpDigits">------</strong></span>
+          <span id="otpTimer" style="color:#34d399;font-weight:700;">30s</span>
+        </div>
+      </div>
+
+      <!-- Live Preview -->
+      <div class="field">
+        <div class="field-label">
+          <span>📋 Định dạng chuẩn gửi lên hệ thống</span>
+        </div>
+        <div id="previewBox" class="preview-box">customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl</div>
+      </div>
+
+      <!-- Checklist -->
+      <label class="check-item">
+        <input id="chkVn" type="checkbox" required />
+        <span>Tôi xác nhận Gmail thuộc <strong>Quốc gia Việt Nam</strong>, là tài khoản trắng và không ở trong nhóm Google Family.</span>
+      </label>
+      <label class="check-item">
+        <input id="chkHstt" type="checkbox" required />
+        <span>Tôi đã <strong>đóng Hồ sơ thanh toán (HSTT)</strong> cũ và bật 2FA đúng theo Trang Hướng Dẫn.</span>
+      </label>
+
+      <button id="submitBtn" class="btn-submit" type="submit" disabled>
+        🚀 Xác nhận Thanh toán &amp; Gửi Đơn Kích Hoạt
+      </button>
+    </form>
+  </div>
+
+  <script>
+    const tg = window.Telegram ? window.Telegram.WebApp : null;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const planId = urlParams.get("plan_id") || "";
+    if (planId) {
+      document.getElementById("guideLink").href = "/webapp/guide?plan_id=" + encodeURIComponent(planId);
+    }
+
+    const initData = tg ? tg.initData : "";
+    let canAfford = false;
+    let activePlanId = planId;
+
+    const emailEl = document.getElementById("email");
+    const passEl = document.getElementById("password");
+    const twoFaEl = document.getElementById("twoFa");
+    const quickPasteEl = document.getElementById("quickPaste");
+    const previewBox = document.getElementById("previewBox");
+    const submitBtn = document.getElementById("submitBtn");
+    const alertBox = document.getElementById("alertBox");
+
+    function showAlert(msg, type) {
+      alertBox.className = "alert " + type;
+      alertBox.textContent = msg;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function formatVnd(n) {
+      return Number(n || 0).toLocaleString("vi-VN") + " đ";
+    }
+
+    function toggleHint(id) {
+      document.getElementById(id).classList.toggle("show");
+    }
+
+    function togglePassword() {
+      const btn = document.querySelector(".toggle-pass");
+      if (passEl.type === "password") {
+        passEl.type = "text";
+        btn.textContent = "Ẩn";
+      } else {
+        passEl.type = "password";
+        btn.textContent = "Hiện";
+      }
+    }
+
+    function normalizeTwoFa(raw) {
+      const clean = raw.toLowerCase().replace(/[^a-z2-7]/g, "");
+      return clean.match(/.{1,4}/g)?.join(" ") || raw.trim();
+    }
+
+    function updatePreview() {
+      const e = emailEl.value.trim() || "customer1@gmail.com";
+      const p = passEl.value.trim() || "abcxyz";
+      const t = twoFaEl.value.trim() ? normalizeTwoFa(twoFaEl.value) : "ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl";
+      previewBox.textContent = `${e} | ${p} | ${t}`;
+    }
+
+    quickPasteEl.addEventListener("input", () => {
+      const parts = quickPasteEl.value.split("|").map(s => s.trim());
+      if (parts.length >= 3) {
+        emailEl.value = parts[0];
+        passEl.value = parts[1];
+        twoFaEl.value = normalizeTwoFa(parts.slice(2).join(" "));
+        updatePreview();
+        refreshOtp();
+      }
+    });
+
+    emailEl.addEventListener("input", updatePreview);
+    passEl.addEventListener("input", updatePreview);
+    twoFaEl.addEventListener("input", () => {
+      updatePreview();
+      refreshOtp();
+    });
+
+    // Base32 + TOTP verifier
+    function base32ToBytes(input) {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      const clean = input.toUpperCase().replace(/[^A-Z2-7]/g, "");
+      if (clean.length < 16) return null;
+      let bits = "";
+      for (const ch of clean) {
+        const idx = alphabet.indexOf(ch);
+        if (idx === -1) return null;
+        bits += idx.toString(2).padStart(5, "0");
+      }
+      const bytes = new Uint8Array(Math.floor(bits.length / 8));
+      for (let i = 0; i < bytes.length; i++) {
+        bytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+      }
+      return bytes;
+    }
+
+    async function computeTotp(secret) {
+      const keyBytes = base32ToBytes(secret);
+      if (!keyBytes) return null;
+      const counter = Math.floor(Date.now() / 1000 / 30);
+      const buf = new ArrayBuffer(8);
+      const view = new DataView(buf);
+      view.setUint32(0, Math.floor(counter / 0x100000000), false);
+      view.setUint32(4, counter >>> 0, false);
+
+      const cryptoKey = await crypto.subtle.importKey(
+        "raw", keyBytes, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]
+      );
+      const sig = new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, buf));
+      const offset = sig[sig.length - 1] & 0x0f;
+      const bin = ((sig[offset] & 0x7f) << 24)
+        | ((sig[offset + 1] & 0xff) << 16)
+        | ((sig[offset + 2] & 0xff) << 8)
+        | (sig[offset + 3] & 0xff);
+      return String(bin % 1000000).padStart(6, "0");
+    }
+
+    async function refreshOtp() {
+      const otpLive = document.getElementById("otpLive");
+      const val = twoFaEl.value.trim();
+      if (!val) { otpLive.style.display = "none"; return; }
+      const code = await computeTotp(val);
+      if (!code) { otpLive.style.display = "none"; return; }
+      otpLive.style.display = "flex";
+      document.getElementById("otpDigits").textContent = code.slice(0, 3) + " " + code.slice(3);
+      const rem = 30 - (Math.floor(Date.now() / 1000) % 30);
+      document.getElementById("otpTimer").textContent = rem + "s";
+    }
+    setInterval(refreshOtp, 1000);
+
+    async function loadMe() {
+      if (!initData) {
+        showAlert("Vui lòng mở Form này trực tiếp từ nút bên trong Bot Telegram để xác thực tài khoản.", "error");
+        return;
+      }
+      try {
+        const res = await fetch(`/api/v1/webapp/me?plan_id=${encodeURIComponent(planId)}`, {
+          headers: { "X-Telegram-Init-Data": initData }
+        });
+        const json = await res.json();
+        if (!json.success) {
+          showAlert(json.message || "Không thể tải thông tin tài khoản.", "error");
+          return;
+        }
+        const d = json.data;
+        activePlanId = d.plan.id;
+        document.getElementById("planName").textContent = d.plan.name;
+        document.getElementById("planPrice").textContent = formatVnd(d.plan.price_vnd);
+        document.getElementById("walletBalance").textContent = formatVnd(d.balance_vnd);
+        canAfford = d.balance_vnd >= d.plan.price_vnd && d.plan.available_stock > 0;
+        const statusEl = document.getElementById("balanceStatus");
+        if (d.plan.available_stock <= 0) {
+          statusEl.textContent = "❌ Hết tồn kho";
+          statusEl.style.color = "#f87171";
+        } else if (canAfford) {
+          statusEl.textContent = "✅ Đủ số dư";
+          statusEl.style.color = "#34d399";
+          submitBtn.disabled = false;
+          submitBtn.textContent = `🚀 Thanh toán ${formatVnd(d.plan.price_vnd)} & Gửi Đơn`;
+        } else {
+          statusEl.textContent = "⚠️ Thiếu tiền";
+          statusEl.style.color = "#fbbf24";
+          showAlert("Số dư ví không đủ. Vui lòng quay lại Bot và dùng lệnh /payadd để nạp tiền tự động (VietQR)!", "error");
+        }
+      } catch (err) {
+        showAlert("Lỗi kết nối tới máy chủ. Vui lòng thử lại.", "error");
+      }
+    }
+
+    document.getElementById("activationForm").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      if (!canAfford) return;
+      submitBtn.disabled = true;
+      submitBtn.textContent = "⏳ Đang mã hóa & gửi đơn...";
+
+      try {
+        const res = await fetch("/api/v1/webapp/activations", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Telegram-Init-Data": initData
+          },
+          body: JSON.stringify({
+            plan_id: activePlanId,
+            email: emailEl.value.trim(),
+            password: passEl.value.trim(),
+            two_fa_secret: normalizeTwoFa(twoFaEl.value)
+          })
+        });
+        const json = await res.json();
+        if (!json.success) {
+          showAlert(json.message + (json.error?.details ? ` (${json.error.details})` : ""), "error");
+          submitBtn.disabled = false;
+          submitBtn.textContent = "🚀 Xác nhận Thanh toán & Gửi Đơn";
+          return;
+        }
+        showAlert(`✅ Tạo đơn thành công! Mã đơn: ${json.data.order_code}. Đơn sẽ được xử lý trong 1-6h.`, "success");
+        setTimeout(() => { if (tg) tg.close(); }, 1800);
+      } catch (err) {
+        showAlert("Lỗi gửi đơn. Vui lòng kiểm tra kết nối mạng.", "error");
+        submitBtn.disabled = false;
+        submitBtn.textContent = "🚀 Xác nhận Thanh toán & Gửi Đơn";
+      }
+    });
+
+    loadMe();
+  </script>
+</body>
+</html>

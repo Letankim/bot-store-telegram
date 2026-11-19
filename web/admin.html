@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Console — Gemini Pro Store</title>
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #090e1a;
+      --sidebar: #0d1424;
+      --panel: #111827;
+      --card: #161f33;
+      --card-hover: #1b2640;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --accent-soft: rgba(59, 130, 246, 0.14);
+      --ok: #10b981;
+      --ok-soft: rgba(16, 185, 129, 0.14);
+      --warn: #f59e0b;
+      --warn-soft: rgba(245, 158, 11, 0.15);
+      --danger: #ef4444;
+      --danger-soft: rgba(239, 68, 68, 0.15);
+      --border: rgba(148, 163, 184, 0.16);
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+      display: flex;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 260px;
+      background: var(--sidebar);
+      border-right: 1px solid var(--border);
+      padding: 22px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      padding: 6px 10px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 10px;
+    }
+    .brand-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #2563eb, #10b981);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      color: #fff;
+      box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+    }
+    .brand-text strong { display: block; font-size: 0.98rem; letter-spacing: -0.01em; }
+    .brand-text span { font-size: 0.75rem; color: var(--muted); }
+
+    .nav-btn {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      width: 100%;
+      padding: 11px 13px;
+      border-radius: 11px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--muted);
+      font-size: 0.89rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.16s ease;
+    }
+    .nav-btn i { font-size: 1.25rem; }
+    .nav-btn:hover { background: rgba(148, 163, 184, 0.08); color: var(--text); }
+    .nav-btn.active {
+      background: var(--accent-soft);
+      border-color: rgba(59, 130, 246, 0.35);
+      color: #60a5fa;
+    }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--muted);
+      padding-left: 8px;
+    }
+
+    /* Main Layout */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .topbar {
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 26px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .topbar-title { display: flex; align-items: center; gap: 10px; }
+    .topbar-title h1 { font-size: 1.08rem; font-weight: 700; }
+    .conn-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: var(--warn-soft);
+      color: #fbbf24;
+    }
+    .conn-pill.ok { background: var(--ok-soft); color: #34d399; }
+
+    .auth-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .input-icon {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .input-icon i {
+      position: absolute;
+      left: 11px;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+    .input-icon input { padding-left: 34px; }
+
+    input, select {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding: 9px 15px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-family: inherit;
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn i { font-size: 1.1rem; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-ok { background: var(--ok); color: #fff; }
+    .btn-ok:hover { background: #059669; }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-ghost {
+      background: rgba(148, 163, 184, 0.12);
+      border-color: var(--border);
+      color: var(--text);
+    }
+    .btn-ghost:hover { background: rgba(148, 163, 184, 0.2); }
+
+    .content {
+      padding: 24px 26px 60px;
+      max-width: 1180px;
+      width: 100%;
+    }
+    .pane { display: none; }
+    .pane.active { display: block; }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .stat-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      flex-shrink: 0;
+    }
+    .stat-icon.blue { background: var(--accent-soft); color: #60a5fa; }
+    .stat-icon.green { background: var(--ok-soft); color: #34d399; }
+    .stat-icon.amber { background: var(--warn-soft); color: #fbbf24; }
+    .stat-label { font-size: 0.78rem; color: var(--muted); }
+    .stat-value { font-size: 1.15rem; font-weight: 800; margin-top: 2px; }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 18px;
+    }
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 1rem;
+      font-weight: 700;
+    }
+    .card-title i { color: #60a5fa; font-size: 1.25rem; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+    }
+    .form-group label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.83rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+    .form-group label i { color: #60a5fa; }
+    .form-group input { width: 100%; }
+    .form-hint { font-size: 0.76rem; color: var(--muted); margin-top: 5px; }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 16px;
+      margin-bottom: 18px;
+    }
+    .qr-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #ffffff;
+      color: #0f172a;
+      padding: 14px;
+      border-radius: 12px;
+      margin: 12px 0;
+    }
+    .qr-box img { width: 168px; height: 168px; }
+    .qr-box span { font-size: 0.78rem; font-weight: 700; margin-top: 8px; }
+
+    .code-line {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      background: rgba(2, 6, 23, 0.65);
+      border: 1px dashed var(--border);
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.82rem;
+      color: #38bdf8;
+      word-break: break-all;
+      margin: 8px 0;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.74rem;
+      font-weight: 700;
+    }
+    .badge-ok { background: var(--ok-soft); color: #34d399; }
+    .badge-warn { background: var(--warn-soft); color: #fbbf24; }
+    .badge-err { background: var(--danger-soft); color: #f87171; }
+
+    .item-row {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 12px;
+      transition: background 0.15s;
+    }
+    .item-row:hover { background: var(--card-hover); }
+    .steps { padding-left: 18px; font-size: 0.84rem; color: var(--muted); }
+    .steps li { margin-bottom: 6px; }
+    .steps strong { color: var(--text); }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: #1e293b;
+      border: 1px solid var(--accent);
+      color: #fff;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 0.86rem;
+      display: none;
+      align-items: center;
+      gap: 8px;
+      z-index: 99;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    @media (max-width: 820px) {
+      body { flex-direction: column; }
+      .sidebar {
+        width: 100%;
+        flex-direction: row;
+        overflow-x: auto;
+        padding: 10px;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+      }
+      .brand, .sidebar-footer { display: none; }
+      .nav-btn { white-space: nowrap; width: auto; }
+      .content { padding: 16px 14px 50px; }
+    }
+  </style>
+</head>
+<body>
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-icon"><i class="bx bxs-bot"></i></div>
+      <div class="brand-text">
+        <strong>Gemini Pro Admin</strong>
+        <span>Control Center v1.0</span>
+      </div>
+    </div>
+
+    <button class="nav-btn active" onclick="switchPane('settings', this)">
+      <i class="bx bx-slider-alt"></i> Cấu hình Hệ thống
+    </button>
+    <button class="nav-btn" onclick="switchPane('orders', this)">
+      <i class="bx bx-receipt"></i> Đơn Kích Hoạt
+    </button>
+    <button class="nav-btn" onclick="switchPane('plans', this)">
+      <i class="bx bx-package"></i> Gói Gemini &amp; Ví
+    </button>
+    <button class="nav-btn" onclick="switchPane('bot', this)">
+      <i class="bx bx-qr-scan"></i> Kết nối Bot &amp; QR
+    </button>
+
+    <div class="sidebar-footer">
+      <i class="bx bx-shield-quarter"></i> AES-256-GCM • PostgreSQL
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>Bảng Điều Khiển Quản Trị</h1>
+        <span id="connPill" class="conn-pill"><i class="bx bx-radio-circle-marked"></i> Chưa kết nối</span>
+      </div>
+      <div class="auth-box">
+        <div class="input-icon">
+          <i class="bx bx-key"></i>
+          <input id="adminKeyInput" type="password" placeholder="Nhập ADMIN_API_KEY..." style="min-width:220px;" />
+        </div>
+        <button class="btn btn-primary" onclick="connectAdmin()">
+          <i class="bx bx-lock-open-alt"></i> Kết nối
+        </button>
+      </div>
+    </header>
+
+    <div class="content">
+      <!-- KPI ROW -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon blue"><i class="bx bx-support"></i></div>
+          <div>
+            <div class="stat-label">Tài khoản Hỗ trợ</div>
+            <div id="kpiSupport" class="stat-value">@kim12ad</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon green"><i class="bx bx-wallet"></i></div>
+          <div>
+            <div class="stat-label">Nạp tối thiểu / lần</div>
+            <div id="kpiMinDeposit" class="stat-value">10.000 đ</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon amber"><i class="bx bx-gift"></i></div>
+          <div>
+            <div class="stat-label">Thưởng mời bạn (Nạp đầu)</div>
+            <div id="kpiReferral" class="stat-value">5.000 đ</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue"><i class="bx bx-time-five"></i></div>
+          <div>
+            <div class="stat-label">Đơn đang chờ xử lý</div>
+            <div id="kpiPending" class="stat-value">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANE 1: LIVE SYSTEM SETTINGS -->
+      <section id="pane-settings" class="pane active">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><i class="bx bx-cog"></i> Cấu Hình Vận Hành (Áp Dụng Ngay Lập Tức)</div>
+            <button class="btn btn-ghost" onclick="loadSettings()"><i class="bx bx-refresh"></i> Tải lại</button>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label><i class="bx bx-user-voice"></i> Tài khoản Hỗ trợ hiển thị trên Bot</label>
+              <input id="cfgSupport" type="text" placeholder="@kim12ad" />
+              <div class="form-hint">Hiển thị ở chân tin nhắn chào mừng và thẻ gói Gemini Pro.</div>
+            </div>
+
+            <div class="form-group">
+              <label><i class="bx bx-money"></i> Số tiền nạp tối thiểu mỗi lần (VND)</label>
+              <input id="cfgMinDeposit" type="number" min="1000" step="1000" placeholder="10000" />
+              <div class="form-hint">Khách không thể tạo mã VietQR thấp hơn mức này.</div>
+            </div>
+
+            <div class="form-group">
+              <label><i class="bx bx-gift"></i> Tiền thưởng mời bạn bè (VND)</label>
+              <input id="cfgRefReward" type="number" min="0" step="1000" placeholder="5000" />
+              <div class="form-hint">Mặc định 5.000 đ khi bạn bè nạp tiền lần đầu tiên.</div>
+            </div>
+
+            <div class="form-group">
+              <label><i class="bx bx-check-shield"></i> Điều kiện nạp lần đầu tối thiểu để nhận thưởng (VND)</label>
+              <input id="cfgRefMinFirst" type="number" min="0" step="1000" placeholder="10000" />
+              <div class="form-hint">Bạn bè bắt buộc phải nạp lần đầu đạt từ mức này trở lên người mời mới được cộng thưởng.</div>
+            </div>
+
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label><i class="bx bx-grid-alt"></i> Các nút mệnh giá nạp nhanh trên Bot (cách nhau bằng dấu phẩy)</label>
+              <input id="cfgQuickAmounts" type="text" placeholder="40000,80000,150000,300000" />
+              <div class="form-hint">Ví dụ: <code>40000,80000,150000,300000</code> — tự động render thành các nút bấm gọn đẹp trên Telegram.</div>
+            </div>
+          </div>
+
+          <div style="margin-top:18px;display:flex;justify-content:flex-end;">
+            <button class="btn btn-ok" onclick="saveSettings()">
+              <i class="bx bx-save"></i> Lưu Cấu Hình Hệ Thống
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANE 2: ORDERS -->
+      <section id="pane-orders" class="pane">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><i class="bx bx-receipt"></i> Danh Sách Đơn Kích Hoạt Gemini Pro</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <select id="orderStatusFilter" onchange="loadOrders()">
+                <option value="PENDING">Đang chờ xử lý (PENDING)</option>
+                <option value="">Tất cả trạng thái</option>
+                <option value="COMPLETED">Đã hoàn tất (COMPLETED)</option>
+                <option value="REFUNDED">Đã hoàn tiền (REFUNDED)</option>
+              </select>
+              <button class="btn btn-ghost" onclick="loadOrders()"><i class="bx bx-refresh"></i> Tải lại</button>
+            </div>
+          </div>
+          <div id="ordersList" style="font-size:0.88rem;color:var(--muted);">Nhập ADMIN_API_KEY để xem đơn hàng.</div>
+        </div>
+      </section>
+
+      <!-- PANE 3: PLANS & WALLET -->
+      <section id="pane-plans" class="pane">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><i class="bx bx-package"></i> Quản Lý Gói Kích Hoạt Gemini Pro</div>
+            <button class="btn btn-ghost" onclick="loadPlans()"><i class="bx bx-refresh"></i> Tải lại</button>
+          </div>
+          <div id="plansList" style="font-size:0.88rem;color:var(--muted);">Nhập ADMIN_API_KEY để quản lý gói.</div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><i class="bx bx-wallet-alt"></i> Cộng Tiền Ví Thủ Công (Hỗ Trợ / Test Luồng Form)</div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label><i class="bx bx-id-card"></i> Telegram ID khách hàng</label>
+              <input id="creditTgId" type="number" placeholder="VD: 123456789" />
+            </div>
+            <div class="form-group">
+              <label><i class="bx bx-coin-stack"></i> Số tiền cộng (VND)</label>
+              <input id="creditAmount" type="number" value="40000" />
+            </div>
+            <div class="form-group">
+              <label><i class="bx bx-note"></i> Nội dung ghi chú</label>
+              <input id="creditDesc" type="text" value="Admin cộng tiền" />
+            </div>
+          </div>
+          <div style="margin-top:14px;">
+            <button class="btn btn-ok" onclick="manualCredit()">
+              <i class="bx bx-plus-circle"></i> Cộng Tiền Vào Ví
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- PANE 4: BOT SETUP & QR -->
+      <section id="pane-bot" class="pane">
+        <div class="grid-3">
+          <div class="card">
+            <div class="card-title" style="margin-bottom:8px;"><i class="bx bx-qr"></i> Quét QR Tạo Bot (@BotFather)</div>
+            <p style="font-size:0.82rem;color:var(--muted);">Quét mã QR bằng điện thoại để mở thẳng lệnh <code>/newbot</code> trên Telegram:</p>
+            <div class="qr-box">
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=https://t.me/BotFather?start=newbot" alt="QR BotFather" />
+              <span>Quét để mở @BotFather</span>
+            </div>
+            <ol class="steps">
+              <li>Bấm <strong>Start</strong> rồi gõ <code>/newbot</code>.</li>
+              <li>Đặt tên &amp; username kết thúc bằng <code>bot</code>.</li>
+              <li>Copy <strong>Bot Token</strong> điền vào <code>TELEGRAM_BOT_TOKEN</code>.</li>
+            </ol>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="margin-bottom:8px;"><i class="bx bx-user-pin"></i> Quét QR Lấy Admin ID</div>
+            <p style="font-size:0.82rem;color:var(--muted);">Lấy Telegram ID của bạn để nhận thông báo đơn mới kèm <code>email | pass | 2fa</code>:</p>
+            <div class="qr-box">
+              <img src="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=https://t.me/userinfobot" alt="QR UserInfoBot" />
+              <span>Quét để mở @userinfobot</span>
+            </div>
+            <ol class="steps">
+              <li>Bấm <strong>Start</strong> trong <strong>@userinfobot</strong>.</li>
+              <li>Copy số ở dòng <strong>Id:</strong> dán vào <code>ADMIN_TELEGRAM_ID</code>.</li>
+            </ol>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="margin-bottom:8px;"><i class="bx bx-check-circle"></i> Trạng Thái Bot &amp; 1-Click Setup</div>
+            <div id="botStatusBox" style="font-size:0.85rem;color:var(--muted);margin-bottom:10px;">
+              Bấm <strong>Kết nối</strong> ở thanh trên để kiểm tra Bot.
+            </div>
+            <div id="myBotQrWrap" style="display:none;">
+              <div class="qr-box">
+                <img id="myBotQrImg" src="" alt="QR My Bot" />
+                <span id="myBotQrLabel">Quét mở Bot của bạn</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+              <button class="btn btn-primary" onclick="loadBotStatus()"><i class="bx bx-refresh"></i> Kiểm tra</button>
+              <button class="btn btn-ok" onclick="autoSetupBot(false)"><i class="bx bx-menu"></i> Đăng ký Menu</button>
+              <button class="btn btn-ghost" onclick="autoSetupBot(true)"><i class="bx bx-globe"></i> Set Webhook</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><i class="bx bx-link-alt"></i> Webhook Cổng Thanh Toán &amp; Liên Kết Mini App</div>
+          </div>
+          <div style="font-size:0.83rem;color:var(--muted);">URL Webhook nhận giao dịch VietQR tự động (cấu hình trong trang quản trị cổng thanh toán):</div>
+          <div class="code-line">
+            <span id="payosWebhookUrl">https://&lt;your-domain&gt;/api/v1/webhooks/payos</span>
+            <button class="btn btn-ghost" onclick="copyText(document.getElementById('payosWebhookUrl').textContent)"><i class="bx bx-copy"></i> Copy</button>
+          </div>
+          <div style="font-size:0.83rem;color:var(--muted);margin-top:12px;">Liên kết Trang Hướng Dẫn 4 Bước (Đóng HSTT &amp; Lấy 2FA):</div>
+          <div class="code-line">
+            <span id="guideUrlText">https://&lt;your-domain&gt;/webapp/guide</span>
+            <button class="btn btn-ghost" onclick="copyText(document.getElementById('guideUrlText').textContent)"><i class="bx bx-copy"></i> Copy</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"><i class="bx bx-info-circle"></i> <span id="toastText"></span></div>
+
+  <script>
+    const keyInput = document.getElementById("adminKeyInput");
+    const savedKey = localStorage.getItem("bot_admin_api_key") || "";
+    if (savedKey) keyInput.value = savedKey;
+
+    function getAdminKey() { return keyInput.value.trim(); }
+    function fmtVnd(n) { return Number(n || 0).toLocaleString("vi-VN") + " đ"; }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      document.getElementById("toastText").textContent = msg;
+      t.style.display = "flex";
+      setTimeout(() => { t.style.display = "none"; }, 3000);
+    }
+
+    function copyText(txt) {
+      navigator.clipboard.writeText(txt).then(() => showToast("Đã copy vào bộ nhớ tạm!"));
+    }
+
+    function switchPane(name, btn) {
+      document.querySelectorAll(".pane").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
+      document.getElementById("pane-" + name).classList.add("active");
+      btn.classList.add("active");
+      if (getAdminKey()) {
+        if (name === "settings") loadSettings();
+        if (name === "orders") loadOrders();
+        if (name === "plans") loadPlans();
+        if (name === "bot") loadBotStatus();
+      }
+    }
+
+    async function apiFetch(path, options = {}) {
+      const res = await fetch(path, {
+        ...options,
+        headers: {
+          "Content-Type": "application/json",
+          "X-Admin-Api-Key": getAdminKey(),
+          ...(options.headers || {})
+        }
+      });
+      return res.json();
+    }
+
+    async function connectAdmin() {
+      const k = getAdminKey();
+      if (!k) return showToast("Vui lòng nhập ADMIN_API_KEY!");
+      localStorage.setItem("bot_admin_api_key", k);
+      const ok = await loadSettings();
+      if (ok) {
+        const pill = document.getElementById("connPill");
+        pill.className = "conn-pill ok";
+        pill.innerHTML = `<i class="bx bx-check-circle"></i> Đã kết nối`;
+        loadOrders();
+        loadPlans();
+        loadBotStatus();
+      }
+    }
+
+    async function loadSettings() {
+      try {
+        const json = await apiFetch("/api/v1/admin/settings");
+        if (!json.success) {
+          showToast("Lỗi xác thực: " + json.message);
+          return false;
+        }
+        const s = json.data;
+        document.getElementById("cfgSupport").value = s.support_handle;
+        document.getElementById("cfgMinDeposit").value = s.min_deposit_vnd;
+        document.getElementById("cfgRefReward").value = s.referral_reward_vnd;
+        document.getElementById("cfgRefMinFirst").value = s.referral_min_first_deposit_vnd;
+        document.getElementById("cfgQuickAmounts").value = s.quick_deposit_amounts;
+
+        document.getElementById("kpiSupport").textContent = s.support_handle;
+        document.getElementById("kpiMinDeposit").textContent = fmtVnd(s.min_deposit_vnd);
+        document.getElementById("kpiReferral").textContent = fmtVnd(s.referral_reward_vnd);
+        return true;
+      } catch (e) {
+        showToast("Không thể kết nối máy chủ!");
+        return false;
+      }
+    }
+
+    async function saveSettings() {
+      const payload = {
+        support_handle: document.getElementById("cfgSupport").value.trim(),
+        min_deposit_vnd: Number(document.getElementById("cfgMinDeposit").value),
+        referral_reward_vnd: Number(document.getElementById("cfgRefReward").value),
+        referral_min_first_deposit_vnd: Number(document.getElementById("cfgRefMinFirst").value),
+        quick_deposit_amounts: document.getElementById("cfgQuickAmounts").value.trim()
+      };
+      const json = await apiFetch("/api/v1/admin/settings", {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      });
+      if (json.success) {
+        showToast("Đã lưu cấu hình! Bot đã áp dụng ngay lập tức.");
+        loadSettings();
+      } else {
+        showToast("Lỗi: " + json.message);
+      }
+    }
+
+    async function loadBotStatus() {
+      const box = document.getElementById("botStatusBox");
+      const json = await apiFetch("/api/v1/admin/bot/status");
+      if (!json.success) {
+        box.innerHTML = `<span class="badge badge-err">${json.message}</span>`;
+        return;
+      }
+      const d = json.data;
+      document.getElementById("payosWebhookUrl").textContent = d.payos_webhook_url;
+      document.getElementById("guideUrlText").textContent = d.guide_url;
+
+      const botLink = d.bot_username ? `https://t.me/${d.bot_username}` : "";
+      box.innerHTML = `
+        <div style="margin-bottom:6px;">Kết nối Telegram: ${d.bot_connected ? '<span class="badge badge-ok"><i class="bx bx-check"></i> ONLINE</span>' : '<span class="badge badge-err"><i class="bx bx-x"></i> OFFLINE</span>'}</div>
+        <div>Bot: <strong>${d.bot_first_name || "N/A"}</strong> (${d.bot_username ? '@' + d.bot_username : 'N/A'})</div>
+        <div>Chế độ: <strong>${d.bot_mode}</strong></div>
+        <div>Cổng VietQR tự động: ${d.payos_configured ? '<span class="badge badge-ok">Đã cấu hình</span>' : '<span class="badge badge-warn">Chưa điền khóa</span>'}</div>
+        <div>Webhook: <code>${d.current_webhook_url || "(Polling)"}</code></div>
+      `;
+      if (botLink) {
+        document.getElementById("myBotQrWrap").style.display = "block";
+        document.getElementById("myBotQrImg").src = `https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=${encodeURIComponent(botLink)}`;
+        document.getElementById("myBotQrLabel").textContent = `Quét mở @${d.bot_username}`;
+      }
+    }
+
+    async function autoSetupBot(registerWebhook) {
+      const json = await apiFetch("/api/v1/admin/bot/setup", {
+        method: "POST",
+        body: JSON.stringify({ register_webhook: registerWebhook })
+      });
+      showToast(json.message);
+      if (json.success) loadBotStatus();
+    }
+
+    async function loadOrders() {
+      const status = document.getElementById("orderStatusFilter").value;
+      const listEl = document.getElementById("ordersList");
+      const url = `/api/v1/admin/orders?page=1&per_page=30${status ? "&status=" + status : ""}`;
+      const json = await apiFetch(url);
+      if (!json.success) {
+        listEl.innerHTML = `<span class="badge badge-err">${json.message}</span>`;
+        return;
+      }
+      if (status === "PENDING") {
+        document.getElementById("kpiPending").textContent = json.meta?.pagination?.total_items ?? json.data.length;
+      }
+      if (!json.data.length) {
+        listEl.textContent = "Chưa có đơn hàng nào trong trạng thái này.";
+        return;
+      }
+      listEl.innerHTML = json.data.map(o => `
+        <div class="item-row">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            <div><strong>#${o.order_code}</strong> • <span class="badge ${o.status === 'COMPLETED' ? 'badge-ok' : o.status === 'REFUNDED' ? 'badge-err' : 'badge-warn'}">${o.status}</span></div>
+            <div style="font-weight:700;color:#34d399;">${fmtVnd(o.price_paid_vnd)}</div>
+          </div>
+          <div class="code-line">
+            <span>${o.credentials_formatted}</span>
+            <button class="btn btn-ghost" onclick="copyText(${JSON.stringify(o.credentials_formatted)})"><i class="bx bx-copy"></i> Copy</button>
+          </div>
+          ${o.status === "PENDING" || o.status === "PROCESSING" ? `
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
+              <button class="btn btn-ok" onclick="completeOrder('${o.id}')"><i class="bx bx-check-double"></i> Hoàn tất &amp; Báo khách</button>
+              <button class="btn btn-danger" onclick="refundOrder('${o.id}')"><i class="bx bx-undo"></i> Hoàn tiền 100% đơn lỗi</button>
+            </div>
+          ` : `<div style="font-size:0.8rem;color:var(--muted);">Ghi chú: ${o.admin_note || "Không có"}</div>`}
+        </div>
+      `).join("");
+    }
+
+    async function completeOrder(id) {
+      const note = prompt("Nhập ghi chú gửi cho khách (có thể để trống):", "Đã kích hoạt Gemini Pro thành công!");
+      if (note === null) return;
+      const json = await apiFetch(`/api/v1/admin/orders/${id}/complete`, {
+        method: "POST",
+        body: JSON.stringify({ admin_note: note || null })
+      });
+      showToast(json.message);
+      loadOrders();
+    }
+
+    async function refundOrder(id) {
+      const reason = prompt("Nhập lý do hoàn tiền cho khách:", "Gmail chưa đóng Hồ sơ thanh toán (HSTT) hoặc sai mật khẩu");
+      if (!reason) return;
+      const json = await apiFetch(`/api/v1/admin/orders/${id}/refund`, {
+        method: "POST",
+        body: JSON.stringify({ reason })
+      });
+      showToast(json.message);
+      loadOrders();
+    }
+
+    async function loadPlans() {
+      const listEl = document.getElementById("plansList");
+      const json = await apiFetch("/api/v1/admin/plans");
+      if (!json.success) {
+        listEl.innerHTML = `<span class="badge badge-err">${json.message}</span>`;
+        return;
+      }
+      listEl.innerHTML = json.data.map(p => `
+        <div class="item-row">
+          <div style="font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
+            <i class="bx bxs-diamond" style="color:#60a5fa;"></i> ${p.name}
+            <span style="color:var(--muted);font-size:0.78rem;font-weight:500;">(${p.code})</span>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+            <label style="font-size:0.82rem;color:var(--muted);">Giá (VND): <input id="price_${p.id}" type="number" value="${p.price_vnd}" style="width:125px;margin-left:4px;" /></label>
+            <label style="font-size:0.82rem;color:var(--muted);">Tồn kho: <input id="stock_${p.id}" type="number" value="${p.available_stock}" style="width:95px;margin-left:4px;" /></label>
+            <span style="font-size:0.82rem;color:var(--muted);">Đã bán: <strong style="color:var(--text);">${p.sold_count}</strong></span>
+            <button class="btn btn-primary" onclick="savePlan('${p.id}')"><i class="bx bx-save"></i> Lưu</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    async function savePlan(id) {
+      const price = Number(document.getElementById("price_" + id).value);
+      const stock = Number(document.getElementById("stock_" + id).value);
+      const json = await apiFetch(`/api/v1/admin/plans/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ price_vnd: price, available_stock: stock })
+      });
+      showToast(json.message);
+      loadPlans();
+    }
+
+    async function manualCredit() {
+      const tgId = document.getElementById("creditTgId").value.trim();
+      const amount = Number(document.getElementById("creditAmount").value);
+      const desc = document.getElementById("creditDesc").value.trim();
+      if (!tgId || !amount) return showToast("Vui lòng nhập đủ Telegram ID và số tiền!");
+      const json = await apiFetch(`/api/v1/admin/wallets/${tgId}/credit`, {
+        method: "POST",
+        body: JSON.stringify({ amount_vnd: amount, description: desc })
+      });
+      showToast(json.success ? `Cộng tiền thành công! Số dư mới: ${fmtVnd(json.data.balance_vnd)}` : json.message);
+    }
+
+    if (savedKey) connectAdmin();
+  </script>
+</body>
+</html>
