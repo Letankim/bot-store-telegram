@@ -17,7 +17,7 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/settings", get(admin::get_settings).put(admin::update_settings))
         .route("/bot/status", get(admin::bot_status))
         .route("/bot/setup", post(admin::bot_setup))
-        .route("/plans", get(admin::list_plans))
+        .route("/plans", get(admin::list_plans).post(admin::create_plan))
         .route("/orders", get(admin::list_orders))
         .route("/orders/{order_id}/complete", post(admin::complete_order))
         .route("/orders/{order_id}/refund", post(admin::refund_order))

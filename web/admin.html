@@ -159,7 +159,7 @@
     }
     .input-icon input { padding-left: 34px; }
 
-    input, select {
+    input, select, textarea {
       background: var(--bg);
       border: 1px solid var(--border);
       color: var(--text);
@@ -170,7 +170,8 @@
       outline: none;
       transition: border-color 0.15s;
     }
-    input:focus, select:focus { border-color: var(--accent); }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    textarea { width: 100%; resize: vertical; line-height: 1.5; }
 
     .btn {
       display: inline-flex;
@@ -534,8 +535,52 @@
         <div class="card">
           <div class="card-head">
             <div class="card-title"><i class="bx bx-package"></i> Quản lý gói kích hoạt Gemini Pro</div>
-            <button class="btn btn-ghost" onclick="loadPlans()"><i class="bx bx-refresh"></i> Tải lại</button>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="btn btn-ok" onclick="toggleNewPlanBox()"><i class="bx bx-plus"></i> Thêm gói mới</button>
+              <button class="btn btn-ghost" onclick="loadPlans()"><i class="bx bx-refresh"></i> Tải lại</button>
+            </div>
           </div>
+
+          <div id="newPlanBox" class="item-row" style="display:none;border-color:rgba(16,185,129,0.45);margin-bottom:16px;">
+            <div style="font-weight:700;margin-bottom:12px;color:#34d399;display:flex;align-items:center;gap:6px;">
+              <i class="bx bx-plus-circle"></i> Tạo gói kích hoạt Gemini Pro mới
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Mã gói (viết liền không dấu)</label>
+                <input id="newPlanCode" type="text" placeholder="VD: GEMINI_PRO_12M" />
+              </div>
+              <div class="form-group">
+                <label>Tên gói hiển thị trên Bot</label>
+                <input id="newPlanName" type="text" placeholder="VD: Gemini Pro Your Mail 12 tháng" />
+              </div>
+              <div class="form-group">
+                <label>Thời hạn (tháng)</label>
+                <input id="newPlanMonths" type="number" value="3" min="1" />
+              </div>
+              <div class="form-group">
+                <label>Giá bán (VND)</label>
+                <input id="newPlanPrice" type="number" value="40000" min="1000" step="1000" />
+              </div>
+              <div class="form-group">
+                <label>Tồn kho ban đầu</label>
+                <input id="newPlanStock" type="number" value="100" min="0" />
+              </div>
+              <div class="form-group">
+                <label>Thứ tự hiển thị</label>
+                <input id="newPlanOrder" type="number" value="3" />
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Mô tả chi tiết hiển thị trên Bot</label>
+                <textarea id="newPlanDesc" rows="4" placeholder="• Trả đơn trong 1-6h...&#10;• Khách hàng cần cung cấp Mail|Pass|2FA (bắt buộc)..."></textarea>
+              </div>
+            </div>
+            <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
+              <button class="btn btn-ghost" onclick="toggleNewPlanBox()">Hủy</button>
+              <button class="btn btn-ok" onclick="createNewPlan()"><i class="bx bx-check"></i> Tạo gói ngay</button>
+            </div>
+          </div>
+
           <div id="plansList" style="font-size:0.88rem;color:var(--muted);">Nhập ADMIN_API_KEY để quản lý gói.</div>
         </div>
 
@@ -833,6 +878,40 @@
       loadOrders();
     }
 
+    function escapeAttr(str) {
+      return String(str ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/"/g, "&quot;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function toggleNewPlanBox() {
+      const box = document.getElementById("newPlanBox");
+      box.style.display = box.style.display === "none" ? "block" : "none";
+    }
+
+    async function createNewPlan() {
+      const payload = {
+        code: document.getElementById("newPlanCode").value.trim(),
+        name: document.getElementById("newPlanName").value.trim(),
+        duration_months: Number(document.getElementById("newPlanMonths").value),
+        price_vnd: Number(document.getElementById("newPlanPrice").value),
+        available_stock: Number(document.getElementById("newPlanStock").value),
+        display_order: Number(document.getElementById("newPlanOrder").value),
+        description_note: document.getElementById("newPlanDesc").value.trim()
+      };
+      const json = await apiFetch("/api/v1/admin/plans", {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      showToast(json.message);
+      if (json.success) {
+        toggleNewPlanBox();
+        loadPlans();
+      }
+    }
+
     async function loadPlans() {
       const listEl = document.getElementById("plansList");
       const json = await apiFetch("/api/v1/admin/plans");
@@ -842,29 +921,78 @@
       }
       listEl.innerHTML = json.data.map(p => `
         <div class="item-row">
-          <div style="font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:6px;">
-            <i class="bx bxs-diamond" style="color:#60a5fa;"></i> ${p.name}
-            <span style="color:var(--muted);font-size:0.78rem;font-weight:500;">(${p.code})</span>
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
+            <div style="font-weight:700;display:flex;align-items:center;gap:6px;">
+              <i class="bx bxs-diamond" style="color:#60a5fa;"></i>
+              <span>${escapeAttr(p.code)}</span>
+            </div>
+            <span class="badge ${p.is_active ? 'badge-ok' : 'badge-err'}">${p.is_active ? 'Đang mở bán' : 'Đang tạm ẩn'}</span>
           </div>
-          <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
-            <label style="font-size:0.82rem;color:var(--muted);">Giá (VND): <input id="price_${p.id}" type="number" value="${p.price_vnd}" style="width:125px;margin-left:4px;" /></label>
-            <label style="font-size:0.82rem;color:var(--muted);">Tồn kho: <input id="stock_${p.id}" type="number" value="${p.available_stock}" style="width:95px;margin-left:4px;" /></label>
-            <span style="font-size:0.82rem;color:var(--muted);">Đã bán: <strong style="color:var(--text);">${p.sold_count}</strong></span>
-            <button class="btn btn-primary" onclick="savePlan('${p.id}')"><i class="bx bx-save"></i> Lưu</button>
+
+          <div class="form-grid">
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Tên gói hiển thị trên Bot</label>
+              <input id="name_${p.id}" type="text" value="${escapeAttr(p.name)}" />
+            </div>
+            <div class="form-group">
+              <label>Giá bán (VND)</label>
+              <input id="price_${p.id}" type="number" value="${p.price_vnd}" min="1000" step="1000" />
+            </div>
+            <div class="form-group">
+              <label>Tồn kho</label>
+              <input id="stock_${p.id}" type="number" value="${p.available_stock}" min="0" />
+            </div>
+            <div class="form-group">
+              <label>Đã bán</label>
+              <input id="sold_${p.id}" type="number" value="${p.sold_count}" min="0" />
+            </div>
+            <div class="form-group">
+              <label>Thời hạn (tháng)</label>
+              <input id="months_${p.id}" type="number" value="${p.duration_months}" min="1" />
+            </div>
+            <div class="form-group">
+              <label>Thứ tự hiển thị</label>
+              <input id="order_${p.id}" type="number" value="${p.display_order}" />
+            </div>
+            <div class="form-group">
+              <label>Trạng thái hiển thị</label>
+              <select id="active_${p.id}" style="width:100%;">
+                <option value="true" ${p.is_active ? 'selected' : ''}>Đang mở bán</option>
+                <option value="false" ${!p.is_active ? 'selected' : ''}>Tạm ẩn khỏi Bot</option>
+              </select>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Mô tả chi tiết hiển thị trên Telegram</label>
+              <textarea id="desc_${p.id}" rows="5">${escapeAttr(p.description_note)}</textarea>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+            <button class="btn btn-primary" onclick="savePlan('${p.id}')">
+              <i class="bx bx-save"></i> Lưu thay đổi gói
+            </button>
           </div>
         </div>
       `).join("");
     }
 
     async function savePlan(id) {
-      const price = Number(document.getElementById("price_" + id).value);
-      const stock = Number(document.getElementById("stock_" + id).value);
+      const payload = {
+        name: document.getElementById("name_" + id).value.trim(),
+        price_vnd: Number(document.getElementById("price_" + id).value),
+        available_stock: Number(document.getElementById("stock_" + id).value),
+        sold_count: Number(document.getElementById("sold_" + id).value),
+        duration_months: Number(document.getElementById("months_" + id).value),
+        display_order: Number(document.getElementById("order_" + id).value),
+        is_active: document.getElementById("active_" + id).value === "true",
+        description_note: document.getElementById("desc_" + id).value.trim()
+      };
       const json = await apiFetch(`/api/v1/admin/plans/${id}`, {
         method: "PUT",
-        body: JSON.stringify({ price_vnd: price, available_stock: stock })
+        body: JSON.stringify(payload)
       });
       showToast(json.message);
-      loadPlans();
+      if (json.success) loadPlans();
     }
 
     async function manualCredit() {

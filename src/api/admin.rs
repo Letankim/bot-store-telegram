@@ -132,15 +132,62 @@ pub async fn bot_setup(
     ))
 }
 
-/// List all active Gemini Pro plans for Admin management.
+/// List all Gemini Pro plans (active & hidden) for Admin management.
 pub async fn list_plans(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
 ) -> Result<ApiResponse<Vec<GeminiPlan>>, AppError> {
-    let plans = plan_repo::list_active_plans(&state.pool).await?;
+    let plans = plan_repo::list_all_plans(&state.pool).await?;
     Ok(ApiResponse::ok(
         plans,
         "Lấy danh sách gói Gemini Pro thành công",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreatePlanReq {
+    pub code: String,
+    pub name: String,
+    pub duration_months: i32,
+    pub price_vnd: i64,
+    pub available_stock: i32,
+    pub description_note: String,
+    pub display_order: Option<i32>,
+}
+
+/// Create a new Gemini Pro plan from Admin Dashboard.
+pub async fn create_plan(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Json(payload): Json<CreatePlanReq>,
+) -> Result<ApiResponse<GeminiPlan>, AppError> {
+    if payload.code.trim().is_empty() || payload.name.trim().is_empty() {
+        return Err(AppError::Validation(
+            "Mã gói và tên gói không được để trống.".to_string(),
+        ));
+    }
+    if payload.price_vnd <= 0 || payload.duration_months <= 0 || payload.available_stock < 0 {
+        return Err(AppError::Validation(
+            "Giá, thời hạn phải lớn hơn 0 và tồn kho không được âm.".to_string(),
+        ));
+    }
+
+    let created = plan_repo::create_plan(
+        &state.pool,
+        &payload.code,
+        &payload.name,
+        payload.duration_months,
+        payload.price_vnd,
+        payload.available_stock,
+        &payload.description_note,
+        payload.display_order.unwrap_or(10),
+    )
+    .await?;
+
+    Ok(ApiResponse::created(
+        created,
+        "Tạo gói Gemini Pro mới thành công",
         ctx.request_id,
     ))
 }
@@ -342,30 +389,40 @@ pub async fn refund_order(
 
 #[derive(Debug, Deserialize)]
 pub struct UpdatePlanReq {
+    pub name: Option<String>,
+    pub duration_months: Option<i32>,
     pub price_vnd: Option<i64>,
     pub available_stock: Option<i32>,
+    pub sold_count: Option<i32>,
+    pub description_note: Option<String>,
+    pub display_order: Option<i32>,
     pub is_active: Option<bool>,
 }
 
-/// Update Gemini Pro plan price or stock.
+/// Update full details of a Gemini Pro plan (name, price, stock, sold count, description, status).
 pub async fn update_plan(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
     Path(plan_id): Path<Uuid>,
     Json(payload): Json<UpdatePlanReq>,
 ) -> Result<ApiResponse<GeminiPlan>, AppError> {
-    let updated = plan_repo::update_plan_stock_and_price(
+    let updated = plan_repo::update_plan_full(
         &state.pool,
         plan_id,
+        payload.name.as_deref(),
+        payload.duration_months,
         payload.price_vnd,
         payload.available_stock,
+        payload.sold_count,
+        payload.description_note.as_deref(),
+        payload.display_order,
         payload.is_active,
     )
     .await?;
 
     Ok(ApiResponse::ok(
         updated,
-        "Cập nhật gói Gemini Pro thành công",
+        "Cập nhật thông tin gói Gemini Pro thành công",
         ctx.request_id,
     ))
 }
