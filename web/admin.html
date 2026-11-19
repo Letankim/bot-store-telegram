@@ -455,6 +455,14 @@
             <div id="kpiPending" class="stat-value">--</div>
           </div>
         </div>
+        <div class="stat-card" style="cursor:pointer;" onclick="loadSmmInfo(true)" title="Bấm để làm mới số dư API">
+          <div class="stat-icon green"><i class="bx bx-coin-stack"></i></div>
+          <div>
+            <div class="stat-label">Số dư API đối tác</div>
+            <div id="kpiApiBalance" class="stat-value">-- xu</div>
+            <div id="kpiApiSub" style="font-size:0.72rem;color:var(--muted);margin-top:2px;">Đang tải...</div>
+          </div>
+        </div>
       </div>
 
       <!-- PANE 1: LIVE SYSTEM SETTINGS -->
@@ -514,7 +522,7 @@
         <div class="card">
           <div class="card-head">
             <div class="card-title"><i class="bx bx-plug"></i> Kết nối API kích hoạt tự động (api.smm.io.vn)</div>
-            <button class="btn btn-primary" onclick="checkSmmInfo()"><i class="bx bx-pulse"></i> Kiểm tra số dư API</button>
+            <button class="btn btn-primary" onclick="loadSmmInfo(true)"><i class="bx bx-pulse"></i> Kiểm tra số dư API</button>
           </div>
 
           <div class="form-grid">
@@ -811,6 +819,7 @@
         loadOrders();
         loadPlans();
         loadBotStatus();
+        loadSmmInfo(false);
       }
     }
 
@@ -870,17 +879,52 @@
       }
     }
 
-    async function checkSmmInfo() {
+    async function loadSmmInfo(showNotify) {
       const box = document.getElementById("smmInfoBox");
-      box.style.display = "flex";
-      box.textContent = "Đang kiểm tra kết nối tới api.smm.io.vn...";
-      const json = await apiFetch("/api/v1/admin/smm/info");
-      if (!json.success) {
-        box.textContent = "Lỗi: " + json.message;
-        return;
+      const kpiVal = document.getElementById("kpiApiBalance");
+      const kpiSub = document.getElementById("kpiApiSub");
+      if (showNotify) {
+        box.style.display = "block";
+        box.textContent = "Đang kiểm tra kết nối tới api.smm.io.vn...";
       }
-      box.textContent = JSON.stringify(json.data);
-      showToast("Kết nối API đối tác thành công!");
+      try {
+        const json = await apiFetch("/api/v1/admin/smm/info");
+        if (!json.success || !json.data || json.data.ok === false) {
+          if (kpiVal) kpiVal.textContent = "Chưa kết nối";
+          if (kpiSub) kpiSub.textContent = json.message || "Chưa cấu hình API Key";
+          if (showNotify) {
+            box.style.display = "block";
+            box.textContent = "Lỗi: " + (json.message || "Không thể kết nối API đối tác");
+          }
+          return;
+        }
+        const d = json.data;
+        const coins = Number(d.coins ?? 0);
+        const usd = (coins * 0.04).toFixed(2);
+        const cost = Number(d.cost_per_job ?? 0);
+
+        if (kpiVal) {
+          kpiVal.textContent = `${coins.toLocaleString("vi-VN")} xu ($${usd})`;
+          kpiVal.style.color = cost > 0 && coins < cost ? "#fbbf24" : "#34d399";
+        }
+        if (kpiSub) {
+          kpiSub.textContent = `OK: ${d.jobs_success ?? 0} • Lỗi: ${d.jobs_failed ?? 0} • Đang chạy: ${d.jobs_running ?? 0}`;
+        }
+
+        box.style.display = "block";
+        box.innerHTML = `
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;width:100%;font-family:Inter,sans-serif;color:var(--text);">
+            <div><span style="color:var(--muted);font-size:0.76rem;">Tài khoản đối tác</span><div style="font-weight:700;">${escapeAttr(d.name || d.username || "N/A")}</div></div>
+            <div><span style="color:var(--muted);font-size:0.76rem;">Số dư khả dụng</span><div style="font-weight:800;color:#34d399;">${coins.toLocaleString("vi-VN")} xu ($${usd})</div></div>
+            <div><span style="color:var(--muted);font-size:0.76rem;">Chi phí / đơn (autopay)</span><div style="font-weight:700;">${cost} xu • Dùng hôm nay: ${d.coins_used_today ?? 0} xu</div></div>
+            <div><span style="color:var(--muted);font-size:0.76rem;">Thống kê đơn API</span><div style="font-weight:700;">OK: ${d.jobs_success ?? 0} • Lỗi: ${d.jobs_failed ?? 0} • Chạy: ${d.jobs_running ?? 0}</div></div>
+          </div>
+        `;
+        if (showNotify) showToast("Đã cập nhật số dư API đối tác!");
+      } catch (e) {
+        if (kpiVal) kpiVal.textContent = "Lỗi tải";
+        if (kpiSub) kpiSub.textContent = "Không kết nối được API";
+      }
     }
 
     async function loadBotStatus() {
