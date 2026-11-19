@@ -509,6 +509,61 @@
             </button>
           </div>
         </div>
+
+        <!-- UPSTREAM PIXEL API CONFIG -->
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title"><i class="bx bx-plug"></i> Kết nối API kích hoạt tự động (api.smm.io.vn)</div>
+            <button class="btn btn-primary" onclick="checkSmmInfo()"><i class="bx bx-pulse"></i> Kiểm tra số dư API</button>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label><i class="bx bx-globe"></i> Base URL API đối tác</label>
+              <input id="cfgSmmUrl" type="text" placeholder="https://api.smm.io.vn" />
+            </div>
+
+            <div class="form-group">
+              <label><i class="bx bx-key"></i> API Key (X-API-Key)</label>
+              <input id="cfgSmmKey" type="password" placeholder="pxl_..." />
+              <div class="form-hint">Lưu bảo mật trong PostgreSQL, không lộ ra phía khách hàng.</div>
+            </div>
+
+            <div class="form-group">
+              <label><i class="bx bx-transfer-alt"></i> Chế độ đẩy đơn hàng</label>
+              <select id="cfgSmmAutoPush" style="width:100%;">
+                <option value="false">Đưa vào hàng chờ PENDING (Admin bấm đẩy thủ công)</option>
+                <option value="true">Tự động đẩy thẳng qua API ngay khi khách gửi form</option>
+              </select>
+              <div class="form-hint">Khi bật tự động, khách sẽ thấy ngay bảng tiến trình 6 bước trực tiếp trên Telegram.</div>
+            </div>
+
+            <div class="form-group">
+              <label><i class="bx bx-chip"></i> Chế độ xử lý Pixel (mode)</label>
+              <select id="cfgSmmMode" style="width:100%;">
+                <option value="autopay">autopay (Kích hoạt tự động đầy đủ)</option>
+                <option value="payadd">payadd (Thêm phương thức thanh toán)</option>
+                <option value="extract">extract (Trích xuất link ưu đãi)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label><i class="bx bx-undo"></i> Tự động hoàn 100% tiền khi API báo lỗi</label>
+              <select id="cfgSmmAutoRefund" style="width:100%;">
+                <option value="true">Bật (tự động hoàn tiền về ví khách)</option>
+                <option value="false">Tắt (chờ Admin kiểm tra hoàn thủ công)</option>
+              </select>
+            </div>
+          </div>
+
+          <div id="smmInfoBox" style="display:none;margin-top:12px;" class="code-line"></div>
+
+          <div style="margin-top:16px;display:flex;justify-content:flex-end;">
+            <button class="btn btn-ok" onclick="saveSettings()">
+              <i class="bx bx-save"></i> Lưu cấu hình API đối tác
+            </button>
+          </div>
+        </div>
       </section>
 
       <!-- PANE 2: ORDERS -->
@@ -519,6 +574,7 @@
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
               <select id="orderStatusFilter" onchange="loadOrders()">
                 <option value="PENDING">Đang chờ xử lý (PENDING)</option>
+                <option value="PROCESSING">Đang chạy tự động (PROCESSING)</option>
                 <option value="">Tất cả trạng thái</option>
                 <option value="COMPLETED">Đã hoàn tất (COMPLETED)</option>
                 <option value="REFUNDED">Đã hoàn tiền (REFUNDED)</option>
@@ -753,6 +809,11 @@
         document.getElementById("cfgReferredBonus").value = s.referred_bonus_vnd;
         document.getElementById("cfgRefMinFirst").value = s.referral_min_first_deposit_vnd;
         document.getElementById("cfgQuickAmounts").value = s.quick_deposit_amounts;
+        document.getElementById("cfgSmmUrl").value = s.smm_api_base_url || "https://api.smm.io.vn";
+        document.getElementById("cfgSmmKey").value = s.smm_api_key || "";
+        document.getElementById("cfgSmmAutoPush").value = String(!!s.smm_auto_push);
+        document.getElementById("cfgSmmMode").value = s.smm_default_mode || "autopay";
+        document.getElementById("cfgSmmAutoRefund").value = String(s.smm_auto_refund_on_fail !== false);
 
         document.getElementById("kpiSupport").textContent = s.support_handle;
         document.getElementById("kpiMinDeposit").textContent = fmtVnd(s.min_deposit_vnd);
@@ -771,7 +832,12 @@
         referral_reward_vnd: Number(document.getElementById("cfgRefReward").value),
         referred_bonus_vnd: Number(document.getElementById("cfgReferredBonus").value),
         referral_min_first_deposit_vnd: Number(document.getElementById("cfgRefMinFirst").value),
-        quick_deposit_amounts: document.getElementById("cfgQuickAmounts").value.trim()
+        quick_deposit_amounts: document.getElementById("cfgQuickAmounts").value.trim(),
+        smm_api_base_url: document.getElementById("cfgSmmUrl").value.trim(),
+        smm_api_key: document.getElementById("cfgSmmKey").value.trim(),
+        smm_auto_push: document.getElementById("cfgSmmAutoPush").value === "true",
+        smm_default_mode: document.getElementById("cfgSmmMode").value,
+        smm_auto_refund_on_fail: document.getElementById("cfgSmmAutoRefund").value === "true"
       };
       const json = await apiFetch("/api/v1/admin/settings", {
         method: "PUT",
@@ -783,6 +849,19 @@
       } else {
         showToast("Lỗi: " + json.message);
       }
+    }
+
+    async function checkSmmInfo() {
+      const box = document.getElementById("smmInfoBox");
+      box.style.display = "flex";
+      box.textContent = "Đang kiểm tra kết nối tới api.smm.io.vn...";
+      const json = await apiFetch("/api/v1/admin/smm/info");
+      if (!json.success) {
+        box.textContent = "Lỗi: " + json.message;
+        return;
+      }
+      box.textContent = JSON.stringify(json.data);
+      showToast("Kết nối API đối tác thành công!");
     }
 
     async function loadBotStatus() {
@@ -846,14 +925,25 @@
             <span>${o.credentials_formatted}</span>
             <button class="btn btn-ghost" onclick="copyText(${JSON.stringify(o.credentials_formatted)})"><i class="bx bx-copy"></i> Copy</button>
           </div>
+          ${o.external_job_id ? `<div style="font-size:0.8rem;color:#93c5fd;margin-bottom:6px;">API Job #${o.external_job_id} • Trạng thái: <strong>${o.external_status || 'running'}</strong> ${o.external_step ? '(' + o.external_step + ')' : ''}</div>` : ''}
           ${o.status === "PENDING" || o.status === "PROCESSING" ? `
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-              <button class="btn btn-ok" onclick="completeOrder('${o.id}')"><i class="bx bx-check-double"></i> Hoàn tất &amp; Báo khách</button>
+              ${o.status === "PENDING" ? `<button class="btn btn-primary" onclick="pushOrderApi('${o.id}')"><i class="bx bx-rocket"></i> Đẩy qua API ngay</button>` : ''}
+              <button class="btn btn-ok" onclick="completeOrder('${o.id}')"><i class="bx bx-check-double"></i> Hoàn tất &amp; báo khách</button>
               <button class="btn btn-danger" onclick="refundOrder('${o.id}')"><i class="bx bx-undo"></i> Hoàn tiền 100% đơn lỗi</button>
             </div>
           ` : `<div style="font-size:0.8rem;color:var(--muted);">Ghi chú: ${o.admin_note || "Không có"}</div>`}
         </div>
       `).join("");
+    }
+
+    async function pushOrderApi(id) {
+      const json = await apiFetch(`/api/v1/admin/orders/${id}/push-api`, {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+      showToast(json.message);
+      if (json.success) loadOrders();
     }
 
     async function completeOrder(id) {

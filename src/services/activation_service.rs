@@ -30,6 +30,10 @@ pub struct AdminOrderView {
     pub credentials_formatted: String,
     pub status: String,
     pub admin_note: Option<String>,
+    pub external_job_id: Option<i64>,
+    pub external_status: Option<String>,
+    pub external_step: Option<String>,
+    pub external_result: Option<String>,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }
 
@@ -40,6 +44,7 @@ pub struct SubmittedOrderOutcome {
     pub user: User,
     pub remaining_balance_vnd: i64,
     pub formatted_credentials: String,
+    pub normalized: NormalizedCredentials,
 }
 
 #[derive(Debug)]
@@ -63,8 +68,9 @@ impl ActivationService {
         email: &str,
         password: &str,
         two_fa_raw: &str,
+        recovery_email: Option<&str>,
     ) -> Result<SubmittedOrderOutcome, AppError> {
-        let normalized = NormalizedCredentials::build(email, password, two_fa_raw)?;
+        let normalized = NormalizedCredentials::build(email, password, two_fa_raw, recovery_email)?;
         let (ciphertext, nonce) = self.crypto.encrypt(&normalized.formatted_line)?;
 
         let user = user_repo::find_by_telegram_id(&self.pool, telegram_id)
@@ -111,13 +117,35 @@ impl ActivationService {
 
         tx.commit().await?;
 
+        let formatted_credentials = normalized.formatted_line.clone();
         Ok(SubmittedOrderOutcome {
             order,
             plan,
             user,
             remaining_balance_vnd: updated_wallet.balance_vnd,
-            formatted_credentials: normalized.formatted_line,
+            formatted_credentials,
+            normalized,
         })
+    }
+
+    /// Decrypt an existing order's credentials (used when Admin clicks "Đẩy qua API").
+    pub async fn load_decrypted_order(
+        &self,
+        order_id: Uuid,
+    ) -> Result<(ActivationOrder, NormalizedCredentials, Option<i64>), AppError> {
+        let order = activation_repo::find_by_id(&self.pool, order_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Không tìm thấy đơn kích hoạt".to_string()))?;
+
+        let decrypted = self
+            .crypto
+            .decrypt(&order.credentials_encrypted, &order.nonce)?;
+        let parsed = NormalizedCredentials::parse_formatted(&decrypted)?;
+        let tg_id = user_repo::find_by_id(&self.pool, order.user_id)
+            .await?
+            .map(|u| u.telegram_id);
+
+        Ok((order, parsed, tg_id))
     }
 
     /// List orders for Admin API with decrypted `email | pass | 2fa` string.
@@ -150,6 +178,10 @@ impl ActivationService {
                 credentials_formatted: decrypted,
                 status: order.status,
                 admin_note: order.admin_note,
+                external_job_id: order.external_job_id,
+                external_status: order.external_status,
+                external_step: order.external_step,
+                external_result: order.external_result,
                 created_at: order.created_at,
             });
         }

@@ -17,9 +17,9 @@ use crate::{
     bot::{self, messages::escape_html},
     domain::{gemini_plan::GeminiPlan, settings::AppSettings, wallet::format_vnd},
     error::AppError,
-    repo::{plan_repo, settings_repo, user_repo, wallet_repo},
+    repo::{activation_repo, plan_repo, settings_repo, user_repo, wallet_repo},
     response::{ApiResponse, PaginationMeta},
-    services::activation_service::AdminOrderView,
+    services::{activation_service::AdminOrderView, smm_service},
     state::SharedState,
 };
 
@@ -213,6 +213,11 @@ pub struct UpdateSettingsReq {
     pub referred_bonus_vnd: i64,
     pub referral_min_first_deposit_vnd: i64,
     pub quick_deposit_amounts: String,
+    pub smm_api_base_url: Option<String>,
+    pub smm_api_key: Option<String>,
+    pub smm_auto_push: Option<bool>,
+    pub smm_default_mode: Option<String>,
+    pub smm_auto_refund_on_fail: Option<bool>,
 }
 
 /// Update live system settings from Admin Dashboard (applies immediately to Bot without restart).
@@ -229,12 +234,113 @@ pub async fn update_settings(
         payload.referred_bonus_vnd,
         payload.referral_min_first_deposit_vnd,
         &payload.quick_deposit_amounts,
+        payload.smm_api_base_url.as_deref(),
+        payload.smm_api_key.as_deref(),
+        payload.smm_auto_push,
+        payload.smm_default_mode.as_deref(),
+        payload.smm_auto_refund_on_fail,
     )
     .await?;
 
     Ok(ApiResponse::ok(
         updated,
         "Lưu cấu hình hệ thống thành công (áp dụng ngay lập tức)",
+        ctx.request_id,
+    ))
+}
+
+/// Check live partner account info & balance from upstream Pixel API (`GET /api/v2/info`).
+pub async fn smm_partner_info(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+) -> Result<ApiResponse<serde_json::Value>, AppError> {
+    let settings = settings_repo::get_settings(&state.pool).await?;
+    let info =
+        smm_service::fetch_partner_info(&settings.smm_api_base_url, &settings.smm_api_key).await?;
+    Ok(ApiResponse::ok(
+        info,
+        "Kiểm tra kết nối API đối tác thành công",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PushOrderApiReq {
+    pub mode: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct PushOrderApiRes {
+    pub order_id: Uuid,
+    pub order_code: String,
+    pub external_job_id: i64,
+    pub position: Option<i64>,
+    pub mode: String,
+}
+
+/// Admin manually pushes a PENDING order from the queue to the upstream Pixel API (`api.smm.io.vn`)
+/// and starts real-time 6-step progress notifications to the customer on Telegram.
+pub async fn push_order_to_api(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Path(order_id): Path<Uuid>,
+    Json(payload): Json<PushOrderApiReq>,
+) -> Result<ApiResponse<PushOrderApiRes>, AppError> {
+    let settings = settings_repo::get_settings(&state.pool).await?;
+    let (order, creds, user_tg_id) = state
+        .activation_service
+        .load_decrypted_order(order_id)
+        .await?;
+
+    if order.status != "PENDING" {
+        return Err(AppError::Conflict(format!(
+            "Đơn {} đang ở trạng thái {}, chỉ có thể đẩy đơn PENDING sang API.",
+            order.order_code, order.status
+        )));
+    }
+
+    let mode = payload
+        .mode
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .unwrap_or(&settings.smm_default_mode);
+
+    let job = smm_service::submit_pixel_job(
+        &settings.smm_api_base_url,
+        &settings.smm_api_key,
+        &creds.email,
+        &creds.password,
+        &creds.two_fa_compact_upper,
+        mode,
+    )
+    .await?;
+
+    activation_repo::set_external_job_started(&state.pool, order.id, job.job_id, &job.mode).await?;
+
+    if let Some(tg_id) = user_tg_id {
+        smm_service::spawn_live_job_tracker(
+            state.clone(),
+            order.id,
+            order.order_code.clone(),
+            tg_id,
+            creds.email,
+            job.job_id,
+            job.position,
+            job.mode.clone(),
+            settings.smm_api_base_url,
+            settings.smm_api_key,
+        );
+    }
+
+    Ok(ApiResponse::ok(
+        PushOrderApiRes {
+            order_id: order.id,
+            order_code: order.order_code,
+            external_job_id: job.job_id,
+            position: job.position,
+            mode: job.mode,
+        },
+        "Đã đẩy đơn sang API đối tác và bật tiến trình trực tiếp cho khách hàng",
         ctx.request_id,
     ))
 }

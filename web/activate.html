@@ -402,6 +402,18 @@
         </div>
       </div>
 
+      <!-- Recovery Email -->
+      <div class="field">
+        <div class="field-label">
+          <span class="field-label-left"><i class="bx bx-mail-send"></i> 4. Email dự phòng (Khuyến nghị)</span>
+          <span class="help-tag" onclick="toggleHint('hintRec')">Tác dụng</span>
+        </div>
+        <input id="recoveryEmail" type="email" placeholder="backup@gmail.com (không bắt buộc)" autocomplete="off" />
+        <div id="hintRec" class="hint-box">
+          • Điền email khôi phục đã gắn trong Gmail (nếu có) để quá trình đăng nhập kích hoạt diễn ra trơn tru hơn nếu Google hỏi xác minh bảo mật.
+        </div>
+      </div>
+
       <!-- Live Preview -->
       <div class="field">
         <div class="field-label">
@@ -448,6 +460,7 @@
     const emailEl = document.getElementById("email");
     const passEl = document.getElementById("password");
     const twoFaEl = document.getElementById("twoFa");
+    const recEl = document.getElementById("recoveryEmail");
     const quickPasteEl = document.getElementById("quickPaste");
     const previewBox = document.getElementById("previewBox");
     const submitBtn = document.getElementById("submitBtn");
@@ -490,7 +503,8 @@
       const e = emailEl.value.trim() || "customer1@gmail.com";
       const p = passEl.value.trim() || "abcxyz";
       const t = twoFaEl.value.trim() ? normalizeTwoFa(twoFaEl.value) : "ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl";
-      previewBox.textContent = `${e} | ${p} | ${t}`;
+      const r = recEl.value.trim();
+      previewBox.textContent = r ? `${e} | ${p} | ${t} | ${r}` : `${e} | ${p} | ${t}`;
     }
 
     quickPasteEl.addEventListener("input", () => {
@@ -498,7 +512,8 @@
       if (parts.length >= 3) {
         emailEl.value = parts[0];
         passEl.value = parts[1];
-        twoFaEl.value = normalizeTwoFa(parts.slice(2).join(" "));
+        twoFaEl.value = normalizeTwoFa(parts[2]);
+        if (parts.length >= 4) recEl.value = parts[3];
         updatePreview();
         refreshOtp();
       }
@@ -506,6 +521,7 @@
 
     emailEl.addEventListener("input", updatePreview);
     passEl.addEventListener("input", updatePreview);
+    recEl.addEventListener("input", updatePreview);
     twoFaEl.addEventListener("input", () => {
       updatePreview();
       refreshOtp();
@@ -619,7 +635,8 @@
             plan_id: activePlanId,
             email: emailEl.value.trim(),
             password: passEl.value.trim(),
-            two_fa_secret: normalizeTwoFa(twoFaEl.value)
+            two_fa_secret: normalizeTwoFa(twoFaEl.value),
+            recovery_email: recEl.value.trim() || null
           })
         });
         const json = await res.json();

@@ -15,10 +15,12 @@ use crate::state::SharedState;
 pub fn build_router(state: SharedState) -> Router {
     let admin_routes = Router::new()
         .route("/settings", get(admin::get_settings).put(admin::update_settings))
+        .route("/smm/info", get(admin::smm_partner_info))
         .route("/bot/status", get(admin::bot_status))
         .route("/bot/setup", post(admin::bot_setup))
         .route("/plans", get(admin::list_plans).post(admin::create_plan))
         .route("/orders", get(admin::list_orders))
+        .route("/orders/{order_id}/push-api", post(admin::push_order_to_api))
         .route("/orders/{order_id}/complete", post(admin::complete_order))
         .route("/orders/{order_id}/refund", post(admin::refund_order))
         .route("/plans/{plan_id}", put(admin::update_plan))

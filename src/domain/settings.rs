@@ -11,6 +11,11 @@ pub struct AppSettings {
     pub referred_bonus_vnd: i64,
     pub referral_min_first_deposit_vnd: i64,
     pub quick_deposit_amounts: String,
+    pub smm_api_base_url: String,
+    pub smm_api_key: String,
+    pub smm_auto_push: bool,
+    pub smm_default_mode: String,
+    pub smm_auto_refund_on_fail: bool,
     pub updated_at: DateTime<Utc>,
 }
 

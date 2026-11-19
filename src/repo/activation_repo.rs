@@ -147,3 +147,63 @@ pub async fn mark_refunded(
     .await?;
     Ok(updated)
 }
+
+pub async fn find_by_id(
+    pool: &PgPool,
+    order_id: Uuid,
+) -> Result<Option<ActivationOrder>, AppError> {
+    let order = sqlx::query_as::<_, ActivationOrder>(
+        "SELECT * FROM activation_orders WHERE id = $1",
+    )
+    .bind(order_id)
+    .fetch_optional(pool)
+    .await?;
+    Ok(order)
+}
+
+pub async fn set_external_job_started(
+    pool: &PgPool,
+    order_id: Uuid,
+    job_id: i64,
+    mode: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE activation_orders
+         SET status = 'PROCESSING',
+             external_job_id = $1,
+             external_status = 'queued',
+             admin_note = COALESCE(admin_note, $2),
+             updated_at = NOW()
+         WHERE id = $3",
+    )
+    .bind(job_id)
+    .bind(format!("Đã đẩy sang API tự động ({mode}, Job #{job_id})"))
+    .bind(order_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn update_external_progress(
+    pool: &PgPool,
+    order_id: Uuid,
+    external_status: &str,
+    external_step: Option<&str>,
+    external_result: Option<&str>,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE activation_orders
+         SET external_status = $1,
+             external_step = COALESCE($2, external_step),
+             external_result = COALESCE($3, external_result),
+             updated_at = NOW()
+         WHERE id = $4",
+    )
+    .bind(external_status)
+    .bind(external_step)
+    .bind(external_result)
+    .bind(order_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}

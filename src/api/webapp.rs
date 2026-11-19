@@ -14,8 +14,9 @@ use crate::{
     crypto::verify_telegram_webapp_init_data,
     domain::{gemini_plan::GeminiPlan, wallet::format_vnd},
     error::AppError,
-    repo::{plan_repo, user_repo, wallet_repo},
+    repo::{activation_repo, plan_repo, settings_repo, user_repo, wallet_repo},
     response::ApiResponse,
+    services::smm_service,
     state::SharedState,
 };
 
@@ -98,6 +99,7 @@ pub struct SubmitActivationReq {
     pub email: String,
     pub password: String,
     pub two_fa_secret: String,
+    pub recovery_email: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -133,10 +135,67 @@ pub async fn submit_activation(
             &payload.email,
             &payload.password,
             &payload.two_fa_secret,
+            payload.recovery_email.as_deref(),
         )
         .await?;
 
+    // Check if Admin enabled auto-push to upstream Pixel API (api.smm.io.vn)
+    let mut final_status = outcome.order.status.clone();
+    let mut auto_pushed_job: Option<i64> = None;
+    if let Ok(settings) = settings_repo::get_settings(&state.pool).await {
+        if settings.smm_auto_push && !settings.smm_api_key.trim().is_empty() {
+            match smm_service::submit_pixel_job(
+                &settings.smm_api_base_url,
+                &settings.smm_api_key,
+                &outcome.normalized.email,
+                &outcome.normalized.password,
+                &outcome.normalized.two_fa_compact_upper,
+                &settings.smm_default_mode,
+            )
+            .await
+            {
+                Ok(job) => {
+                    let _ = activation_repo::set_external_job_started(
+                        &state.pool,
+                        outcome.order.id,
+                        job.job_id,
+                        &job.mode,
+                    )
+                    .await;
+                    final_status = "PROCESSING".to_string();
+                    auto_pushed_job = Some(job.job_id);
+
+                    smm_service::spawn_live_job_tracker(
+                        state.clone(),
+                        outcome.order.id,
+                        outcome.order.order_code.clone(),
+                        outcome.user.telegram_id,
+                        outcome.normalized.email.clone(),
+                        job.job_id,
+                        job.position,
+                        job.mode,
+                        settings.smm_api_base_url,
+                        settings.smm_api_key,
+                    );
+                }
+                Err(err) => {
+                    tracing::error!(
+                        error = ?err,
+                        order_code = %outcome.order.order_code,
+                        "Auto-push to upstream Pixel API failed; order kept in PENDING queue"
+                    );
+                }
+            }
+        }
+    }
+
     // Notify Customer via Telegram
+    let status_note = if auto_pushed_job.is_some() {
+        "🚀 Hệ thống đã tự động đẩy đơn xử lý — tiến trình 6 bước đang hiển thị trực tiếp bên dưới!"
+    } else {
+        "⏳ Đơn hàng của bạn đã được tiếp nhận và sẽ sớm được xử lý. Nếu đơn lỗi, hệ thống sẽ hoàn 100% tiền về ví của bạn!"
+    };
+
     let customer_msg = format!(
         "✅ <b>Đặt đơn kích hoạt Gemini Pro thành công!</b>\n\n\
          • Mã đơn: <code>{}</code>\n\
@@ -144,12 +203,13 @@ pub async fn submit_activation(
          • Gmail: <code>{}</code>\n\
          • Đã thanh toán: <b>{} đ</b>\n\
          • Số dư còn lại: <b>{} đ</b>\n\n\
-         ⏳ Đơn hàng của bạn đã được tiếp nhận và sẽ sớm được xử lý. Nếu đơn lỗi, hệ thống sẽ hoàn 100% tiền về ví của bạn!",
+         {}",
         outcome.order.order_code,
         escape_html(&outcome.plan.name),
         escape_html(&outcome.order.gmail_masked),
         format_vnd(outcome.order.price_paid_vnd),
         format_vnd(outcome.remaining_balance_vnd),
+        status_note,
     );
     let _ = state
         .bot
@@ -157,14 +217,18 @@ pub async fn submit_activation(
         .parse_mode(ParseMode::Html)
         .await;
 
-    // Notify Admin via Telegram with exact copy-ready `email | pass | 2fa` format
+    // Notify Admin via Telegram with exact copy-ready format
     if let Some(admin_id) = state.config.admin_telegram_id {
+        let mode_line = match auto_pushed_job {
+            Some(jid) => format!("\n🚀 Đã tự động đẩy sang API (Job #{jid})"),
+            None => "\n📥 Trạng thái: Đang nằm trong hàng chờ (PENDING)".to_string(),
+        };
         let admin_msg = format!(
             "🔔 <b>ĐƠN KÍCH HOẠT GEMINI PRO MỚI!</b>\n\
              • Mã đơn: <code>{}</code>\n\
              • Order ID: <code>{}</code>\n\
              • Gói: <b>{}</b> ({} đ)\n\
-             • Khách: {} (ID: <code>{}</code>)\n\n\
+             • Khách: {} (ID: <code>{}</code>){}\n\n\
              📋 <b>Thông tin chuẩn (chạm để copy):</b>\n\
              <code>{}</code>",
             outcome.order.order_code,
@@ -173,6 +237,7 @@ pub async fn submit_activation(
             format_vnd(outcome.order.price_paid_vnd),
             escape_html(&outcome.user.full_name),
             outcome.user.telegram_id,
+            mode_line,
             escape_html(&outcome.formatted_credentials),
         );
         let _ = state
@@ -189,7 +254,7 @@ pub async fn submit_activation(
             gmail_masked: outcome.order.gmail_masked,
             price_paid_vnd: outcome.order.price_paid_vnd,
             remaining_balance_vnd: outcome.remaining_balance_vnd,
-            status: outcome.order.status,
+            status: final_status,
         },
         "Tạo đơn kích hoạt Gemini Pro thành công",
         ctx.request_id,
