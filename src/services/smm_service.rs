@@ -2,7 +2,11 @@ use std::time::{Duration, Instant};
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use teloxide::{prelude::*, types::ParseMode};
+use teloxide::{
+    prelude::*,
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, ParseMode},
+};
+use url::Url;
 use uuid::Uuid;
 
 use crate::{
@@ -231,16 +235,8 @@ pub fn spawn_live_job_tracker(
                 .filter(|s| !s.is_empty())
                 .map(str::to_string);
 
-            // Extract offer/result link if API returns any known field name
-            let offer_link = val
-                .get("offer_url")
-                .or_else(|| val.get("offer_link"))
-                .or_else(|| val.get("link"))
-                .or_else(|| val.get("result_url"))
-                .or_else(|| val.get("result"))
-                .and_then(|v| v.as_str())
-                .filter(|s| !s.is_empty())
-                .map(str::to_string);
+            // Extract offer/result link (primary field from api.smm.io.vn is `extract_link`)
+            let offer_link = extract_link_from_response(&val);
 
             let _ = activation_repo::update_external_progress(
                 &state.pool,
@@ -264,11 +260,21 @@ pub fn spawn_live_job_tracker(
 
             if rendered != last_rendered {
                 if let Some(ref msg) = sent_msg {
-                    let _ = state
+                    let mut req = state
                         .bot
                         .edit_message_text(msg.chat.id, msg.id, &rendered)
-                        .parse_mode(ParseMode::Html)
-                        .await;
+                        .parse_mode(ParseMode::Html);
+                    if status == "success" {
+                        if let Some(ref link) = offer_link {
+                            if let Ok(parsed_url) = Url::parse(link) {
+                                let kb = InlineKeyboardMarkup::new(vec![vec![
+                                    InlineKeyboardButton::url("🔗 Mở link ưu đãi ngay", parsed_url),
+                                ]]);
+                                req = req.reply_markup(kb);
+                            }
+                        }
+                    }
+                    let _ = req.await;
                 }
                 last_rendered = rendered;
             }
@@ -322,6 +328,36 @@ pub fn spawn_live_job_tracker(
             }
         }
     });
+}
+
+fn extract_link_from_response(val: &serde_json::Value) -> Option<String> {
+    let known_keys = [
+        "extract_link",
+        "offer_url",
+        "offer_link",
+        "link",
+        "result_url",
+        "result",
+        "url",
+    ];
+    for k in known_keys {
+        if let Some(s) = val.get(k).and_then(|v| v.as_str()).map(str::trim) {
+            if !s.is_empty() {
+                return Some(s.to_string());
+            }
+        }
+    }
+    // Bulletproof fallback: scan any string field in the response for an https:// URL
+    if let Some(obj) = val.as_object() {
+        for v in obj.values() {
+            if let Some(s) = v.as_str().map(str::trim) {
+                if s.starts_with("https://") || s.starts_with("http://") {
+                    return Some(s.to_string());
+                }
+            }
+        }
+    }
+    None
 }
 
 fn step_index_from_name(step: Option<&str>) -> usize {

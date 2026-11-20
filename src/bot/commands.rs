@@ -474,14 +474,20 @@ async fn handle_my_orders(
             "PROCESSING" => "⚙️",
             _ => "⏳",
         };
-        lines.push(format!(
+        let mut line = format!(
             "{} <code>{}</code> | {} | <b>{} đ</b> | <i>{}</i>",
             icon,
             o.order_code,
             messages::escape_html(&o.gmail_masked),
             format_vnd(o.price_paid_vnd),
             o.status
-        ));
+        );
+        if let Some(ref res) = o.external_result {
+            if res.starts_with("http://") || res.starts_with("https://") {
+                line.push_str(&format!("\n   🔗 Link ưu đãi: <code>{}</code>", messages::escape_html(res)));
+            }
+        }
+        lines.push(line);
     }
 
     bot.send_message(chat_id, lines.join("\n"))

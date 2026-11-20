@@ -1038,6 +1038,7 @@
             <button class="btn btn-ghost" onclick="copyText(${JSON.stringify(o.credentials_formatted)})"><i class="bx bx-copy"></i> Copy</button>
           </div>
           ${o.external_job_id ? `<div style="font-size:0.8rem;color:#93c5fd;margin-bottom:6px;">API Job #${o.external_job_id} • Trạng thái: <strong>${o.external_status || 'running'}</strong> ${o.external_step ? '(' + o.external_step + ')' : ''}</div>` : ''}
+          ${o.external_result && o.external_result.startsWith("http") ? `<div class="code-line" style="border-color:rgba(16,185,129,0.5);color:#34d399;"><span>🔗 ${escapeAttr(o.external_result)}</span><button class="btn btn-ghost" onclick="copyText(${JSON.stringify(o.external_result)})"><i class="bx bx-copy"></i> Copy link</button></div>` : ''}
           ${o.status === "PENDING" || o.status === "PROCESSING" ? `
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
               ${o.status === "PENDING" ? `<button class="btn btn-primary" onclick="pushOrderApi('${o.id}')"><i class="bx bx-rocket"></i> Đẩy qua API (${o.plan_api_mode})</button>` : ''}
