@@ -317,7 +317,7 @@
     <div class="card">
       <div class="plan-header">
         <div>
-          <div class="plan-eyebrow">Dịch vụ kích hoạt chính chủ</div>
+          <div id="planEyebrow" class="plan-eyebrow">Dịch vụ kích hoạt chính chủ</div>
           <div id="planName" class="plan-title">Đang tải thông tin gói...</div>
         </div>
         <div id="planPrice" class="price-pill">--- đ</div>
@@ -594,6 +594,16 @@
         }
         const d = json.data;
         activePlanId = d.plan.id;
+        const eyebrowEl = document.getElementById("planEyebrow");
+        if (eyebrowEl) {
+          if (d.plan.api_mode === "payadd") {
+            eyebrowEl.textContent = "Dịch vụ thêm PaySafeCard tự động";
+          } else if (d.plan.api_mode === "extract") {
+            eyebrowEl.textContent = "Dịch vụ trích xuất link ưu đãi";
+          } else {
+            eyebrowEl.textContent = "Dịch vụ kích hoạt Gemini Pro chính chủ";
+          }
+        }
         document.getElementById("planName").textContent = d.plan.name;
         document.getElementById("planPrice").textContent = formatVnd(d.plan.price_vnd);
         document.getElementById("walletBalance").textContent = formatVnd(d.balance_vnd);

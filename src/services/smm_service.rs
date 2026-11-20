@@ -408,15 +408,21 @@ fn step_index_from_name(step: Option<&str>) -> usize {
         return 0;
     };
     let lower = s.to_lowercase();
-    if lower.contains("claim")
+    if lower.contains("add payment")
+        || lower.contains("claim")
         || lower.contains("autopay")
         || lower.contains("payadd")
         || lower.contains("extract")
         || lower.contains("finish")
         || lower.contains("done")
+        || lower.contains("completed")
     {
         6
-    } else if lower.contains("offer") || lower.contains("pixel") || lower.contains("eligib") {
+    } else if lower.contains("payment profile")
+        || lower.contains("offer")
+        || lower.contains("pixel")
+        || lower.contains("eligib")
+    {
         5
     } else if lower.contains("2fa") || lower.contains("totp") || lower.contains("otp") || lower.contains("verify") {
         4
@@ -440,20 +446,31 @@ fn render_progress_card(
     error_msg: Option<&str>,
     elapsed_secs: u64,
 ) -> String {
-    let title = if mode == "extract" {
-        "Trích xuất ưu đãi tự động"
-    } else {
-        "Kích hoạt Gemini Pro tự động"
+    let title = match mode {
+        "extract" => "Trích xuất ưu đãi tự động",
+        "payadd" => "Thêm PaySafeCard tự động",
+        _ => "Kích hoạt Gemini Pro tự động",
     };
 
-    let steps = [
-        "1. Email",
-        "2. Kiểm tra spam",
-        "3. Mật khẩu",
-        "4. Xác thực 2 bước",
-        "5. Kiểm tra ưu đãi",
-        "6. Nhận ưu đãi",
-    ];
+    let steps = if mode == "payadd" {
+        [
+            "1. Email",
+            "2. Kiểm tra spam",
+            "3. Mật khẩu",
+            "4. Xác thực 2 bước",
+            "5. Hồ sơ thanh toán",
+            "6. Thêm PaySafeCard",
+        ]
+    } else {
+        [
+            "1. Email",
+            "2. Kiểm tra spam",
+            "3. Mật khẩu",
+            "4. Xác thực 2 bước",
+            "5. Kiểm tra ưu đãi",
+            "6. Nhận ưu đãi",
+        ]
+    };
 
     let active_idx = match status {
         "success" => 7,
@@ -487,6 +504,8 @@ fn render_progress_card(
                     "🎉 <b>Hoàn tất thành công!</b>\n🔗 Link ưu đãi:\n<code>{}</code>",
                     escape_html(link)
                 )
+            } else if mode == "payadd" {
+                "🎉 <b>Thêm PaySafeCard tự động thành công!</b>".to_string()
             } else {
                 "🎉 <b>Kích hoạt Gemini Pro thành công!</b>".to_string()
             }
