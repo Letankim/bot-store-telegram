@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use teloxide::{
     payloads::SetWebhookSetters,
     prelude::*,
-    types::ParseMode,
+    types::{InlineKeyboardButton, InlineKeyboardMarkup, ParseMode},
 };
 use url::Url;
 use uuid::Uuid;
@@ -537,6 +537,87 @@ pub async fn list_orders(
             total_items: total.max(0) as u64,
             total_pages,
         },
+    ))
+}
+
+#[derive(Debug, Serialize)]
+pub struct SyncOrderLinkRes {
+    pub order_id: Uuid,
+    pub order_code: String,
+    pub external_job_id: i64,
+    pub extract_link: Option<String>,
+    pub sent_to_user: bool,
+}
+
+/// Sync `extract_link` from upstream Pixel API for an existing order and resend it to the customer on Telegram.
+pub async fn sync_and_resend_order_link(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Path(order_id): Path<Uuid>,
+) -> Result<ApiResponse<SyncOrderLinkRes>, AppError> {
+    let settings = settings_repo::get_settings(&state.pool).await?;
+    let order = activation_repo::find_by_id(&state.pool, order_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Không tìm thấy đơn hàng".to_string()))?;
+
+    let job_id = order.external_job_id.ok_or_else(|| {
+        AppError::Validation("Đơn hàng này chưa được đẩy qua API đối tác (chưa có Job ID).".to_string())
+    })?;
+
+    let (ext_status, ext_step, maybe_link) =
+        smm_service::fetch_job_status(&settings.smm_api_base_url, &settings.smm_api_key, job_id)
+            .await?;
+
+    let Some(link) = maybe_link else {
+        return Err(AppError::NotFound(format!(
+            "Job #{job_id} (trạng thái: {ext_status}) hiện không có link ưu đãi."
+        )));
+    };
+
+    activation_repo::update_external_progress(
+        &state.pool,
+        order.id,
+        &ext_status,
+        ext_step.as_deref(),
+        Some(&link),
+    )
+    .await?;
+
+    let mut sent_to_user = false;
+    if let Ok(Some(user)) = user_repo::find_by_id(&state.pool, order.user_id).await {
+        let msg = format!(
+            "🔗 <b>Link ưu đãi cho đơn hàng của bạn!</b>\n\n\
+             • Mã đơn: <code>{}</code>\n\
+             • Gmail: <code>{}</code>\n\
+             • Link ưu đãi:\n<code>{}</code>",
+            order.order_code,
+            escape_html(&order.gmail_masked),
+            escape_html(&link),
+        );
+        let mut req = state
+            .bot
+            .send_message(ChatId(user.telegram_id), msg)
+            .parse_mode(ParseMode::Html);
+        if let Ok(parsed_url) = Url::parse(&link) {
+            req = req.reply_markup(InlineKeyboardMarkup::new(vec![vec![
+                InlineKeyboardButton::url("🔗 Mở link ưu đãi ngay", parsed_url),
+            ]]));
+        }
+        if req.await.is_ok() {
+            sent_to_user = true;
+        }
+    }
+
+    Ok(ApiResponse::ok(
+        SyncOrderLinkRes {
+            order_id: order.id,
+            order_code: order.order_code,
+            external_job_id: job_id,
+            extract_link: Some(link),
+            sent_to_user,
+        },
+        "Đã đồng bộ link ưu đãi và gửi bù cho khách hàng qua Telegram!",
+        ctx.request_id,
     ))
 }
 

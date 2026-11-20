@@ -330,7 +330,50 @@ pub fn spawn_live_job_tracker(
     });
 }
 
-fn extract_link_from_response(val: &serde_json::Value) -> Option<String> {
+/// Query live status & extract link of an existing Pixel job (`GET /api/v2/pixel/status/{job_id}`).
+pub async fn fetch_job_status(
+    base_url: &str,
+    api_key: &str,
+    job_id: i64,
+) -> Result<(String, Option<String>, Option<String>), AppError> {
+    if api_key.trim().is_empty() {
+        return Err(AppError::Validation(
+            "Chưa cấu hình API Key đối tác trong trang quản trị.".to_string(),
+        ));
+    }
+    let url = format!(
+        "{}/api/v2/pixel/status/{}",
+        base_url.trim_end_matches('/'),
+        job_id
+    );
+    let resp = Client::new()
+        .get(&url)
+        .header("X-API-Key", api_key.trim())
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| AppError::PaymentGateway(format!("Không thể truy vấn Job #{job_id}: {e}")))?;
+
+    let val: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| AppError::PaymentGateway(format!("Phản hồi không hợp lệ từ API: {e}")))?;
+
+    let status = val
+        .get("status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_lowercase();
+    let step = val
+        .get("current_step")
+        .and_then(|v| v.as_str())
+        .map(str::to_string);
+    let link = extract_link_from_response(&val);
+
+    Ok((status, step, link))
+}
+
+pub fn extract_link_from_response(val: &serde_json::Value) -> Option<String> {
     let known_keys = [
         "extract_link",
         "offer_url",

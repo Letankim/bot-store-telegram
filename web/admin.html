@@ -1045,10 +1045,24 @@
               <button class="btn btn-ok" onclick="completeOrder('${o.id}')"><i class="bx bx-check-double"></i> Hoàn tất &amp; báo khách</button>
               <button class="btn btn-danger" onclick="refundOrder('${o.id}')"><i class="bx bx-undo"></i> Hoàn tiền 100% đơn lỗi</button>
             </div>
-          ` : `<div style="font-size:0.8rem;color:var(--muted);">Ghi chú: ${o.admin_note || "Không có"}</div>`}
+          ` : `
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;">
+              <div style="font-size:0.8rem;color:var(--muted);">Ghi chú: ${o.admin_note || "Không có"}</div>
+              ${o.external_job_id ? `<button class="btn btn-primary" onclick="syncOrderLink('${o.id}')"><i class="bx bx-sync"></i> Lấy lại &amp; gửi bù link</button>` : ''}
+            </div>
+          `}
         </div>
       `).join("");
       updateSelectedCount();
+    }
+
+    async function syncOrderLink(id) {
+      const json = await apiFetch(`/api/v1/admin/orders/${id}/sync-link`, {
+        method: "POST",
+        body: JSON.stringify({})
+      });
+      showToast(json.message);
+      if (json.success) loadOrders();
     }
 
     async function pushOrderApi(id) {

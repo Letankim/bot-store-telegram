@@ -22,6 +22,7 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/orders", get(admin::list_orders))
         .route("/orders/batch-push-api", post(admin::batch_push_orders_to_api))
         .route("/orders/{order_id}/push-api", post(admin::push_order_to_api))
+        .route("/orders/{order_id}/sync-link", post(admin::sync_and_resend_order_link))
         .route("/orders/{order_id}/complete", post(admin::complete_order))
         .route("/orders/{order_id}/refund", post(admin::refund_order))
         .route("/plans/{plan_id}", put(admin::update_plan))
