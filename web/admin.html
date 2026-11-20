@@ -80,9 +80,9 @@
       font-size: 0.83rem;
     }
 
-    /* Authenticated Dashboard Shell (hidden until login succeeds) */
+    /* Authenticated Dashboard Shell */
     .app-shell {
-      display: none;
+      display: flex;
       min-height: 100vh;
       width: 100%;
     }
@@ -452,26 +452,7 @@
   </style>
 </head>
 <body>
-  <!-- LOGIN GATE (Only view visible before authentication) -->
-  <div id="loginGate" class="login-gate">
-    <form class="login-card" onsubmit="handleLoginSubmit(event)">
-      <div class="login-head">
-        <div class="brand-icon"><i class="bx bxs-shield-alt-2"></i></div>
-        <h1>Đăng nhập quản trị</h1>
-        <p>Nhập khóa <code>ADMIN_API_KEY</code> để truy cập bảng điều khiển Gemini Pro Admin.</p>
-      </div>
-      <div id="loginErr" class="login-err"></div>
-      <div class="form-group" style="margin-bottom:14px;">
-        <label><i class="bx bx-key"></i> Khóa quản trị (ADMIN_API_KEY)</label>
-        <input id="adminKeyInput" type="password" placeholder="Nhập ADMIN_API_KEY..." autocomplete="current-password" required />
-      </div>
-      <button id="loginSubmitBtn" type="submit" class="btn btn-primary" style="width:100%;padding:11px 16px;">
-        <i class="bx bx-lock-open-alt"></i> Đăng nhập hệ thống
-      </button>
-    </form>
-  </div>
-
-  <!-- AUTHENTICATED ADMIN SHELL -->
+  <!-- AUTHENTICATED ADMIN SHELL (Only served by server after valid HttpOnly cookie auth) -->
   <div id="appShell" class="app-shell">
   <!-- SIDEBAR -->
   <aside class="sidebar">
@@ -701,15 +682,58 @@
 
       <!-- PANE 2.5: USERS & WALLETS -->
       <section id="pane-users" class="pane">
+        <div class="stats-grid" style="margin-bottom:16px;">
+          <div class="stat-card">
+            <div class="stat-icon blue"><i class="bx bx-group"></i></div>
+            <div>
+              <div class="stat-label">Tổng người dùng</div>
+              <div id="uSumTotal" class="stat-value">--</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><i class="bx bx-credit-card"></i></div>
+            <div>
+              <div class="stat-label">Tổng tiền đã nạp</div>
+              <div id="uSumDeposited" class="stat-value">-- đ</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon amber"><i class="bx bx-wallet"></i></div>
+            <div>
+              <div class="stat-label">Tổng số dư ví hiện có</div>
+              <div id="uSumBalance" class="stat-value">-- đ</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue" style="background:rgba(239,68,68,0.15);color:#f87171;"><i class="bx bx-block"></i></div>
+            <div>
+              <div class="stat-label">Tài khoản bị khóa</div>
+              <div id="uSumBanned" class="stat-value">--</div>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-head">
             <div class="card-title"><i class="bx bx-group"></i> Quản lý người dùng &amp; ví nội bộ</div>
             <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-              <input id="userSearchInput" type="text" placeholder="Tìm theo tên, @username, Telegram ID..." style="min-width:240px;" onkeydown="if(event.key==='Enter') loadUsers()" />
-              <button class="btn btn-primary" onclick="loadUsers()"><i class="bx bx-search"></i> Tìm kiếm</button>
+              <input id="userSearchInput" type="text" placeholder="Tìm theo tên, @username, Telegram ID..." style="min-width:240px;" onkeydown="if(event.key==='Enter') loadUsers(1)" />
+              <select id="userPerPage" onchange="loadUsers(1)">
+                <option value="10">10 / trang</option>
+                <option value="20" selected>20 / trang</option>
+                <option value="50">50 / trang</option>
+              </select>
+              <button class="btn btn-primary" onclick="loadUsers(1)"><i class="bx bx-search"></i> Tìm kiếm</button>
             </div>
           </div>
           <div id="usersList" style="font-size:0.88rem;color:var(--muted);">Đang tải danh sách người dùng...</div>
+          <div id="usersPagination" style="display:none;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+            <div id="usersPageInfo" style="font-size:0.84rem;color:var(--muted);">Trang 1 / 1</div>
+            <div style="display:flex;gap:8px;">
+              <button id="usersPrevBtn" class="btn btn-ghost" onclick="changeUsersPage(-1)"><i class="bx bx-chevron-left"></i> Trang trước</button>
+              <button id="usersNextBtn" class="btn btn-ghost" onclick="changeUsersPage(1)">Trang sau <i class="bx bx-chevron-right"></i></button>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -884,11 +908,9 @@
   <div id="toast" class="toast"><i class="bx bx-info-circle"></i> <span id="toastText"></span></div>
 
   <script>
-    const keyInput = document.getElementById("adminKeyInput");
-    const savedKey = localStorage.getItem("bot_admin_api_key") || "";
-    if (savedKey) keyInput.value = savedKey;
+    let currentUsersPage = 1;
+    let totalUsersPages = 1;
 
-    function getAdminKey() { return keyInput.value.trim(); }
     function fmtVnd(n) { return Number(n || 0).toLocaleString("vi-VN") + " đ"; }
 
     function showToast(msg) {
@@ -907,94 +929,83 @@
       document.querySelectorAll(".nav-btn").forEach(b => b.classList.remove("active"));
       document.getElementById("pane-" + name).classList.add("active");
       btn.classList.add("active");
-      if (getAdminKey()) {
-        if (name === "settings") loadSettings();
-        if (name === "orders") loadOrders();
-        if (name === "users") loadUsers();
-        if (name === "plans") loadPlans();
-        if (name === "bot") loadBotStatus();
-      }
+      if (name === "settings") loadSettings();
+      if (name === "orders") loadOrders();
+      if (name === "users") loadUsers(currentUsersPage);
+      if (name === "plans") loadPlans();
+      if (name === "bot") loadBotStatus();
     }
 
     async function apiFetch(path, options = {}) {
       const res = await fetch(path, {
         ...options,
+        credentials: "same-origin",
         headers: {
           "Content-Type": "application/json",
-          "X-Admin-Api-Key": getAdminKey(),
           ...(options.headers || {})
         }
       });
+      if (res.status === 401) {
+        window.location.reload();
+        return { success: false, message: "Phiên đăng nhập đã hết hạn" };
+      }
       return res.json();
     }
 
-    function showLoginError(msg) {
-      const el = document.getElementById("loginErr");
-      if (!el) return;
-      el.textContent = msg;
-      el.style.display = msg ? "block" : "none";
+    async function logoutAdmin() {
+      await fetch("/api/v1/admin/logout", { method: "POST", credentials: "same-origin" });
+      window.location.reload();
     }
 
-    async function handleLoginSubmit(ev) {
-      ev.preventDefault();
-      await connectAdmin();
-    }
-
-    function logoutAdmin() {
-      localStorage.removeItem("bot_admin_api_key");
-      keyInput.value = "";
-      document.getElementById("appShell").style.display = "none";
-      document.getElementById("loginGate").style.display = "flex";
-      showLoginError("");
-      showToast("Đã đăng xuất khỏi trang quản trị.");
-    }
-
-    async function connectAdmin() {
-      const k = getAdminKey();
-      if (!k) return showLoginError("Vui lòng nhập ADMIN_API_KEY!");
-      const btn = document.getElementById("loginSubmitBtn");
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Đang xác thực...';
-      }
-      showLoginError("");
-      const ok = await loadSettings();
-      if (btn) {
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bx bx-lock-open-alt"></i> Đăng nhập hệ thống';
-      }
-      if (ok) {
-        localStorage.setItem("bot_admin_api_key", k);
-        document.getElementById("loginGate").style.display = "none";
-        document.getElementById("appShell").style.display = "flex";
-        loadOrders();
-        loadUsers();
-        loadPlans();
-        loadBotStatus();
-        loadSmmInfo(false);
-      } else {
-        localStorage.removeItem("bot_admin_api_key");
-        document.getElementById("appShell").style.display = "none";
-        document.getElementById("loginGate").style.display = "flex";
-        showLoginError("ADMIN_API_KEY không chính xác hoặc máy chủ không phản hồi.");
+    function changeUsersPage(delta) {
+      const next = currentUsersPage + delta;
+      if (next >= 1 && next <= totalUsersPages) {
+        loadUsers(next);
       }
     }
 
-    async function loadUsers() {
+    async function loadUsers(page = 1) {
+      currentUsersPage = Math.max(1, page);
+      const perPage = Number(document.getElementById("userPerPage")?.value || 20);
       const search = (document.getElementById("userSearchInput")?.value || "").trim();
       const listEl = document.getElementById("usersList");
+      const pagBar = document.getElementById("usersPagination");
       listEl.textContent = "Đang tải danh sách người dùng...";
-      const url = `/api/v1/admin/users?page=1&per_page=50${search ? "&search=" + encodeURIComponent(search) : ""}`;
+
+      const url = `/api/v1/admin/users?page=${currentUsersPage}&per_page=${perPage}${search ? "&search=" + encodeURIComponent(search) : ""}`;
       const json = await apiFetch(url);
       if (!json.success) {
         listEl.innerHTML = `<span class="badge badge-err">${json.message}</span>`;
+        if (pagBar) pagBar.style.display = "none";
         return;
       }
-      if (!json.data.length) {
+
+      const sum = json.data.summary;
+      if (sum) {
+        document.getElementById("uSumTotal").textContent = Number(sum.total_users).toLocaleString("vi-VN");
+        document.getElementById("uSumDeposited").textContent = fmtVnd(sum.total_deposited_vnd);
+        document.getElementById("uSumBalance").textContent = fmtVnd(sum.total_balance_vnd);
+        document.getElementById("uSumBanned").textContent = Number(sum.banned_users).toLocaleString("vi-VN");
+      }
+
+      const users = json.data.users || [];
+      const meta = json.meta?.pagination;
+      totalUsersPages = Math.max(1, meta?.total_pages || 1);
+
+      if (pagBar && meta) {
+        pagBar.style.display = "flex";
+        document.getElementById("usersPageInfo").textContent =
+          `Trang ${meta.page} / ${totalUsersPages} • Tổng ${Number(meta.total_items).toLocaleString("vi-VN")} người dùng`;
+        document.getElementById("usersPrevBtn").disabled = meta.page <= 1;
+        document.getElementById("usersNextBtn").disabled = meta.page >= totalUsersPages;
+      }
+
+      if (!users.length) {
         listEl.textContent = "Không tìm thấy người dùng nào.";
         return;
       }
-      listEl.innerHTML = json.data.map(u => `
+
+      listEl.innerHTML = users.map(u => `
         <div class="item-row">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
             <div>
@@ -1042,7 +1053,7 @@
         body: JSON.stringify({ delta_vnd: sign * amt, description: desc })
       });
       showToast(json.success ? `Thành công! Số dư mới: ${fmtVnd(json.data.balance_vnd)}` : json.message);
-      if (json.success) loadUsers();
+      if (json.success) loadUsers(currentUsersPage);
     }
 
     async function toggleBanUser(userId, banState) {
@@ -1051,7 +1062,7 @@
         body: JSON.stringify({ is_banned: banState })
       });
       showToast(json.message);
-      if (json.success) loadUsers();
+      if (json.success) loadUsers(currentUsersPage);
     }
 
     function closeTxModal() {
@@ -1496,7 +1507,13 @@
       showToast(json.success ? `Cộng tiền thành công! Số dư mới: ${fmtVnd(json.data.balance_vnd)}` : json.message);
     }
 
-    if (savedKey) connectAdmin();
+    // Auto-load all dashboard data immediately (page is only served by server after cookie auth)
+    loadSettings();
+    loadOrders();
+    loadUsers(1);
+    loadPlans();
+    loadBotStatus();
+    loadSmmInfo(false);
   </script>
 </body>
 </html>

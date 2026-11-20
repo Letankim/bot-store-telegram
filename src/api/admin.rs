@@ -1,7 +1,8 @@
 use axum::{
     Extension, Json,
     extract::{Path, Query, State},
-    response::Html,
+    http::{HeaderMap, HeaderValue, header::SET_COOKIE},
+    response::{Html, IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 use teloxide::{
@@ -13,8 +14,9 @@ use url::Url;
 use uuid::Uuid;
 
 use crate::{
-    api::middleware::RequestContext,
+    api::middleware::{ADMIN_COOKIE_NAME, RequestContext, is_admin_authenticated},
     bot::{self, messages::escape_html},
+    crypto::{compute_admin_session_token, constant_time_eq_str},
     domain::{
         gemini_plan::GeminiPlan,
         settings::AppSettings,
@@ -23,7 +25,7 @@ use crate::{
     error::AppError,
     repo::{
         activation_repo, plan_repo, settings_repo,
-        user_repo::{self, AdminUserWithWallet},
+        user_repo::{self, AdminUserWithWallet, AdminUsersSummary},
         wallet_repo,
     },
     response::{ApiResponse, PaginationMeta},
@@ -31,11 +33,86 @@ use crate::{
     state::SharedState,
 };
 
+const ADMIN_LOGIN_HTML: &str = include_str!("../../web/admin_login.html");
 const ADMIN_HTML: &str = include_str!("../../web/admin.html");
 
-/// Serve Admin Configuration & Order Management Dashboard (`/admin`).
-pub async fn serve_admin_page() -> Html<&'static str> {
-    Html(ADMIN_HTML)
+/// Server-side protected `/admin`:
+/// - Unauthenticated visitors ONLY receive the minimal login page HTML (zero dashboard DOM exposed).
+/// - Authenticated visitors (valid HttpOnly `admin_session` cookie) receive the full dashboard.
+pub async fn serve_admin_page(
+    State(state): State<SharedState>,
+    headers: HeaderMap,
+) -> Html<&'static str> {
+    if is_admin_authenticated(&headers, &state.config.admin_api_key) {
+        Html(ADMIN_HTML)
+    } else {
+        Html(ADMIN_LOGIN_HTML)
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdminLoginReq {
+    pub api_key: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AdminAuthRes {
+    pub authenticated: bool,
+}
+
+/// Authenticate admin with `ADMIN_API_KEY` and set HttpOnly `admin_session` cookie.
+pub async fn admin_login(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Json(payload): Json<AdminLoginReq>,
+) -> Result<Response, AppError> {
+    if !constant_time_eq_str(payload.api_key.trim(), &state.config.admin_api_key) {
+        return Err(AppError::Unauthorized(
+            "ADMIN_API_KEY không chính xác.".to_string(),
+        ));
+    }
+
+    let token = compute_admin_session_token(&state.config.admin_api_key)?;
+    let secure_flag = if state.config.app_env == "production" {
+        "; Secure"
+    } else {
+        ""
+    };
+    let cookie = format!(
+        "{ADMIN_COOKIE_NAME}={token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400{secure_flag}"
+    );
+
+    let mut resp = ApiResponse::ok(
+        AdminAuthRes {
+            authenticated: true,
+        },
+        "Đăng nhập quản trị thành công",
+        ctx.request_id,
+    )
+    .into_response();
+
+    if let Ok(val) = HeaderValue::from_str(&cookie) {
+        resp.headers_mut().insert(SET_COOKIE, val);
+    }
+
+    Ok(resp)
+}
+
+/// Clear `admin_session` cookie and log out.
+pub async fn admin_logout(Extension(ctx): Extension<RequestContext>) -> Response {
+    let cookie = format!("{ADMIN_COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0");
+    let mut resp = ApiResponse::ok(
+        AdminAuthRes {
+            authenticated: false,
+        },
+        "Đã đăng xuất khỏi trang quản trị",
+        ctx.request_id,
+    )
+    .into_response();
+    if let Ok(val) = HeaderValue::from_str(&cookie) {
+        resp.headers_mut().insert(SET_COOKIE, val);
+    }
+    resp
 }
 
 #[derive(Debug, Serialize)]
@@ -850,16 +927,23 @@ pub struct ListUsersQuery {
     pub per_page: Option<u32>,
 }
 
-/// List all users with wallet balances, order counts & referral counts for `/admin`.
+#[derive(Debug, Serialize)]
+pub struct ListUsersRes {
+    pub summary: AdminUsersSummary,
+    pub users: Vec<AdminUserWithWallet>,
+}
+
+/// List all users with global summary stats, wallet balances, order counts & pagination.
 pub async fn list_users(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
     Query(q): Query<ListUsersQuery>,
-) -> Result<ApiResponse<Vec<AdminUserWithWallet>>, AppError> {
+) -> Result<ApiResponse<ListUsersRes>, AppError> {
     let page = q.page.unwrap_or(1).max(1);
-    let per_page = q.per_page.unwrap_or(30).clamp(1, 100);
+    let per_page = q.per_page.unwrap_or(20).clamp(1, 100);
     let offset = i64::from((page - 1) * per_page);
 
+    let summary = user_repo::get_users_summary(&state.pool).await?;
     let (users, total) = user_repo::list_users_with_wallets(
         &state.pool,
         q.search.as_deref(),
@@ -868,10 +952,10 @@ pub async fn list_users(
     )
     .await?;
 
-    let total_pages = ((total as f64) / (per_page as f64)).ceil() as u32;
+    let total_pages = ((total as f64) / (per_page as f64)).ceil().max(1.0) as u32;
 
     Ok(ApiResponse::ok_paginated(
-        users,
+        ListUsersRes { summary, users },
         "Lấy danh sách người dùng thành công",
         ctx.request_id,
         PaginationMeta {

@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Đăng nhập quản trị — Gemini Pro Admin</title>
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #090e1a;
+      --panel: #111827;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --danger-soft: rgba(239, 68, 68, 0.15);
+      --border: rgba(148, 163, 184, 0.18);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: var(--text);
+      background: radial-gradient(circle at top, rgba(37, 99, 235, 0.2), transparent 55%), var(--bg);
+    }
+    .login-card {
+      width: 100%;
+      max-width: 410px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 30px 26px;
+      box-shadow: 0 22px 55px rgba(0, 0, 0, 0.5);
+    }
+    .login-head {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin-bottom: 22px;
+    }
+    .brand-icon {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, #2563eb, #10b981);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.75rem;
+      color: #fff;
+      margin-bottom: 13px;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+    }
+    .login-head h1 { font-size: 1.22rem; font-weight: 800; }
+    .login-head p { font-size: 0.83rem; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+    .login-err {
+      display: none;
+      margin-bottom: 14px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--danger-soft);
+      border: 1px solid rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+      font-size: 0.83rem;
+    }
+    label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.83rem;
+      font-weight: 600;
+      margin-bottom: 7px;
+      color: #cbd5e1;
+    }
+    label i { color: #60a5fa; }
+    input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 11px 13px;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      margin-bottom: 16px;
+    }
+    input:focus { border-color: var(--accent); }
+    button {
+      width: 100%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 11px 16px;
+      border-radius: 10px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-family: inherit;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:hover { background: #2563eb; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+  <form class="login-card" onsubmit="submitLogin(event)">
+    <div class="login-head">
+      <div class="brand-icon"><i class="bx bxs-shield-alt-2"></i></div>
+      <h1>Đăng nhập quản trị</h1>
+      <p>Nhập khóa <code>ADMIN_API_KEY</code> để xác thực phiên quản trị bảo mật.</p>
+    </div>
+
+    <div id="loginErr" class="login-err"></div>
+
+    <label><i class="bx bx-key"></i> Khóa quản trị (ADMIN_API_KEY)</label>
+    <input id="apiKeyInput" type="password" placeholder="Nhập ADMIN_API_KEY..." autocomplete="current-password" required autofocus />
+
+    <button id="loginBtn" type="submit">
+      <i class="bx bx-lock-open-alt"></i> Đăng nhập hệ thống
+    </button>
+  </form>
+
+  <script>
+    async function submitLogin(ev) {
+      ev.preventDefault();
+      const errBox = document.getElementById("loginErr");
+      const btn = document.getElementById("loginBtn");
+      const apiKey = document.getElementById("apiKeyInput").value.trim();
+      errBox.style.display = "none";
+
+      if (!apiKey) {
+        errBox.textContent = "Vui lòng nhập ADMIN_API_KEY.";
+        errBox.style.display = "block";
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Đang xác thực...';
+
+      try {
+        const res = await fetch("/api/v1/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ api_key: apiKey })
+        });
+        const json = await res.json();
+        if (json.success) {
+          window.location.reload();
+          return;
+        }
+        errBox.textContent = json.message || "ADMIN_API_KEY không chính xác.";
+        errBox.style.display = "block";
+      } catch (e) {
+        errBox.textContent = "Không thể kết nối tới máy chủ.";
+        errBox.style.display = "block";
+      }
+
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bx bx-lock-open-alt"></i> Đăng nhập hệ thống';
+    }
+  </script>
+</body>
+</html>

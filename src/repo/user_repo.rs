@@ -90,6 +90,29 @@ pub async fn list_users_with_wallets(
     Ok((rows, total))
 }
 
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct AdminUsersSummary {
+    pub total_users: i64,
+    pub total_deposited_vnd: i64,
+    pub total_balance_vnd: i64,
+    pub banned_users: i64,
+}
+
+pub async fn get_users_summary(pool: &PgPool) -> Result<AdminUsersSummary, AppError> {
+    let row = sqlx::query_as::<_, AdminUsersSummary>(
+        "SELECT
+            COUNT(u.id)::BIGINT AS total_users,
+            COALESCE(SUM(w.total_deposited_vnd), 0)::BIGINT AS total_deposited_vnd,
+            COALESCE(SUM(w.balance_vnd), 0)::BIGINT AS total_balance_vnd,
+            COUNT(u.id) FILTER (WHERE u.is_banned = TRUE)::BIGINT AS banned_users
+         FROM users u
+         JOIN wallets w ON w.user_id = u.id",
+    )
+    .fetch_one(pool)
+    .await?;
+    Ok(row)
+}
+
 pub async fn set_user_banned(
     pool: &PgPool,
     user_id: Uuid,

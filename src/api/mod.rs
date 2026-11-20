@@ -42,6 +42,8 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/webhooks/payos", post(webhooks::payos_webhook))
         .route("/webapp/me", get(webapp::webapp_me))
         .route("/webapp/activations", post(webapp::submit_activation))
+        .route("/admin/login", post(admin::admin_login))
+        .route("/admin/logout", post(admin::admin_logout))
         .nest("/admin", admin_routes);
 
     Router::new()

@@ -67,6 +67,15 @@ pub fn constant_time_eq_str(a: &str, b: &str) -> bool {
     bool::from(a.as_bytes().ct_eq(b.as_bytes()))
 }
 
+/// Derive a signed HttpOnly cookie token from `ADMIN_API_KEY` using HMAC-SHA256
+/// so the raw API key is never exposed in browser cookies or localStorage.
+pub fn compute_admin_session_token(admin_api_key: &str) -> Result<String, AppError> {
+    let mut mac = <HmacSha256 as Mac>::new_from_slice(admin_api_key.as_bytes())
+        .map_err(|_| AppError::Internal("Failed to derive admin session token".to_string()))?;
+    mac.update(b"bot_store_telegram_admin_session_v1");
+    Ok(hex::encode(mac.finalize().into_bytes()))
+}
+
 /// Generate PayOS payment creation signature (HMAC-SHA256).
 pub fn sign_payos_create_payment(
     amount: i64,
