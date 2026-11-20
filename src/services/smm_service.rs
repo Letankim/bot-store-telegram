@@ -235,6 +235,25 @@ pub fn spawn_auto_queue_worker(state: SharedState) {
                     );
                     let _ = activation_repo::mark_submit_failed(&state.pool, order.id, &err_str)
                         .await;
+                    if let Some(admin_id) = state.config.admin_telegram_id {
+                        let admin_msg = format!(
+                            "⚠️ <b>LỖI ĐẨY ĐƠN TỰ ĐỘNG SANG API!</b>\n\n\
+                             • Mã đơn: <code>{}</code>\n\
+                             • Chế độ: <b>{}</b>\n\
+                             • Gmail: <code>{}</code>\n\
+                             • Lý do: <i>{}</i>\n\n\
+                             👉 Đơn vẫn đang nằm ở hàng chờ <b>PENDING</b> trên <code>/admin</code> để bạn kiểm tra lại.",
+                            order.order_code,
+                            escape_html(&plan_api_mode),
+                            escape_html(&creds.email),
+                            escape_html(&err_str),
+                        );
+                        let _ = state
+                            .bot
+                            .send_message(ChatId(admin_id), admin_msg)
+                            .parse_mode(ParseMode::Html)
+                            .await;
+                    }
                     // Back off a bit before checking next order
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
@@ -386,6 +405,37 @@ pub fn spawn_live_job_tracker(
                     .activation_service
                     .complete_order(order_id, Some(&note))
                     .await;
+
+                // Notify Admin that order succeeded
+                if let Some(admin_id) = state.config.admin_telegram_id {
+                    let mins = elapsed_secs / 60;
+                    let secs = elapsed_secs % 60;
+                    let link_line = offer_link
+                        .as_deref()
+                        .map(|l| format!("\n• Link ưu đãi: <code>{}</code>", escape_html(l)))
+                        .unwrap_or_default();
+                    let admin_msg = format!(
+                        "✅ <b>ĐƠN ĐÃ XỬ LÝ THÀNH CÔNG!</b>\n\n\
+                         • Mã đơn: <code>{}</code> (Job #{})\n\
+                         • Chế độ: <b>{}</b>\n\
+                         • Gmail: <code>{}</code>\n\
+                         • Khách (TG ID): <code>{}</code>\n\
+                         • Thời gian: <code>{:02}:{:02}</code>{}",
+                        order_code,
+                        job_id,
+                        escape_html(&mode),
+                        escape_html(&gmail),
+                        user_telegram_id,
+                        mins,
+                        secs,
+                        link_line,
+                    );
+                    let _ = state
+                        .bot
+                        .send_message(ChatId(admin_id), admin_msg)
+                        .parse_mode(ParseMode::Html)
+                        .await;
+                }
                 return;
             }
 
@@ -397,12 +447,14 @@ pub fn spawn_live_job_tracker(
                     .map(|s| s.smm_auto_refund_on_fail)
                     .unwrap_or(true);
 
+                let mut refunded_automatically = false;
                 if auto_refund {
                     if let Ok(refund_out) = state
                         .activation_service
                         .refund_failed_order(order_id, &reason)
                         .await
                     {
+                        refunded_automatically = true;
                         let new_bal = refund_out.refunded_balance_vnd.unwrap_or(0);
                         let refund_msg = format!(
                             "↩️ <b>Đã tự động hoàn tiền 100% đơn lỗi!</b>\n\n\
@@ -421,6 +473,36 @@ pub fn spawn_live_job_tracker(
                             .parse_mode(ParseMode::Html)
                             .await;
                     }
+                }
+
+                // Notify Admin that order failed (whether auto-refunded or waiting manual review)
+                if let Some(admin_id) = state.config.admin_telegram_id {
+                    let refund_status = if refunded_automatically {
+                        "Đã tự động hoàn 100% về ví khách"
+                    } else {
+                        "Đang TẮT hoàn tự động — cần Admin kiểm tra & xử lý trên /admin"
+                    };
+                    let admin_msg = format!(
+                        "❌ <b>ĐƠN XỬ LÝ THẤT BẠI!</b>\n\n\
+                         • Mã đơn: <code>{}</code> (Job #{})\n\
+                         • Chế độ: <b>{}</b>\n\
+                         • Gmail: <code>{}</code>\n\
+                         • Khách (TG ID): <code>{}</code>\n\
+                         • Lý do lỗi: <i>{}</i>\n\
+                         • Trạng thái hoàn tiền: <b>{}</b>",
+                        order_code,
+                        job_id,
+                        escape_html(&mode),
+                        escape_html(&gmail),
+                        user_telegram_id,
+                        escape_html(&reason),
+                        refund_status,
+                    );
+                    let _ = state
+                        .bot
+                        .send_message(ChatId(admin_id), admin_msg)
+                        .parse_mode(ParseMode::Html)
+                        .await;
                 }
                 return;
             }
