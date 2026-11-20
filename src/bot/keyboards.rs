@@ -172,3 +172,11 @@ pub fn back_to_home_keyboard() -> InlineKeyboardMarkup {
         "back:home",
     )]])
 }
+
+/// Inline keyboard attached to restock broadcast alerts ("Mua ngay" + "Xem sản phẩm khác").
+pub fn restock_broadcast_keyboard(plan_id: &str) -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![vec![
+        InlineKeyboardButton::callback("🛒 Mua ngay", format!("plan:{plan_id}")),
+        InlineKeyboardButton::callback("📋 Xem sản phẩm khác", "back:plans"),
+    ]])
+}

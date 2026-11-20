@@ -1532,7 +1532,11 @@
             </div>
           </div>
 
-          <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <label style="display:flex;align-items:center;gap:7px;font-size:0.82rem;color:var(--muted);cursor:pointer;">
+              <input id="notify_${p.id}" type="checkbox" checked style="width:16px;height:16px;accent-color:#3b82f6;" />
+              <span>Gửi thông báo "Hàng mới vừa lên kho" tới tất cả user khi tăng tồn kho</span>
+            </label>
             <button class="btn btn-primary" onclick="savePlan('${p.id}')">
               <i class="bx bx-save"></i> Lưu thay đổi gói
             </button>
@@ -1551,6 +1555,7 @@
         display_order: Number(document.getElementById("order_" + id).value),
         api_mode: document.getElementById("apimode_" + id).value,
         is_active: document.getElementById("active_" + id).value === "true",
+        notify_restock: document.getElementById("notify_" + id)?.checked !== false,
         description_note: document.getElementById("desc_" + id).value.trim()
       };
       const json = await apiFetch(`/api/v1/admin/plans/${id}`, {

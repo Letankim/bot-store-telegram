@@ -829,9 +829,11 @@ pub struct UpdatePlanReq {
     pub api_mode: Option<String>,
     pub display_order: Option<i32>,
     pub is_active: Option<bool>,
+    pub notify_restock: Option<bool>,
 }
 
 /// Update full details of a Gemini Pro plan (name, price, stock, sold count, description, api_mode, status).
+/// Automatically broadcasts a "HÀNG MỚI VỪA LÊN KHO" notification to all users when stock increases.
 pub async fn update_plan(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
@@ -845,6 +847,11 @@ pub async fn update_plan(
             ));
         }
     }
+
+    let previous_stock = plan_repo::find_by_id(&state.pool, plan_id)
+        .await?
+        .map(|p| p.available_stock)
+        .unwrap_or(0);
 
     let updated = plan_repo::update_plan_full(
         &state.pool,
@@ -861,11 +868,51 @@ pub async fn update_plan(
     )
     .await?;
 
-    Ok(ApiResponse::ok(
-        updated,
-        "Cập nhật thông tin gói Gemini Pro thành công",
-        ctx.request_id,
-    ))
+    let added_qty = updated.available_stock - previous_stock;
+    let should_notify = added_qty > 0 && updated.is_active && payload.notify_restock.unwrap_or(true);
+
+    if should_notify {
+        let state_bg = state.clone();
+        let plan_bg = updated.clone();
+        tokio::spawn(async move {
+            let Ok(tg_ids) = user_repo::list_all_active_telegram_ids(&state_bg.pool).await else {
+                return;
+            };
+            let text = bot::messages::restock_broadcast_message(&plan_bg, added_qty);
+            let kb = bot::keyboards::restock_broadcast_keyboard(&plan_bg.id.to_string());
+            let mut sent_ok = 0usize;
+            for tg_id in tg_ids {
+                if state_bg
+                    .bot
+                    .send_message(ChatId(tg_id), &text)
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(kb.clone())
+                    .await
+                    .is_ok()
+                {
+                    sent_ok += 1;
+                }
+                // Pace at ~25 msg/sec to stay safely below Telegram's 30 msg/sec broadcast limit
+                tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+            }
+            tracing::info!(
+                plan_code = %plan_bg.code,
+                added_qty,
+                sent_ok,
+                "Finished restock broadcast notification"
+            );
+        });
+    }
+
+    let msg = if should_notify {
+        format!(
+            "Đã cập nhật gói (+{added_qty} tồn kho) và đang gửi thông báo lên kho tới tất cả người dùng!"
+        )
+    } else {
+        "Cập nhật thông tin gói Gemini Pro thành công".to_string()
+    };
+
+    Ok(ApiResponse::ok(updated, msg, ctx.request_id))
 }
 
 #[derive(Debug, Deserialize)]

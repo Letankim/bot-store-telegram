@@ -169,3 +169,19 @@ pub fn vietqr_photo_caption(
         bank_lines
     )
 }
+
+pub fn restock_broadcast_message(plan: &GeminiPlan, added_qty: i32) -> String {
+    let name = escape_html(&plan.name);
+    format!(
+        "📢 <b>HÀNG MỚI VỪA LÊN KHO</b>\n\
+         ━━━━━━━━━━━━━━━━━━━━\n\n\
+         ✨ <b>{name}</b>\n\n\
+         📦 Sản phẩm: <b>{name}</b>\n\
+         💵 Giá: <b>{}đ</b>\n\
+         ✅ Vừa thêm: <b>{} tài khoản</b>\n\
+         📊 Kho hiện tại: <b>{} tài khoản</b>",
+        format_vnd(plan.price_vnd),
+        added_qty,
+        plan.available_stock,
+    )
+}

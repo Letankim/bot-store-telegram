@@ -113,6 +113,14 @@ pub async fn get_users_summary(pool: &PgPool) -> Result<AdminUsersSummary, AppEr
     Ok(row)
 }
 
+pub async fn list_all_active_telegram_ids(pool: &PgPool) -> Result<Vec<i64>, AppError> {
+    let ids: Vec<(i64,)> =
+        sqlx::query_as("SELECT telegram_id FROM users WHERE is_banned = FALSE")
+            .fetch_all(pool)
+            .await?;
+    Ok(ids.into_iter().map(|(id,)| id).collect())
+}
+
 pub async fn set_user_banned(
     pool: &PgPool,
     user_id: Uuid,
