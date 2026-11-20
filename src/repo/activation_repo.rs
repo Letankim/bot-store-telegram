@@ -161,6 +161,42 @@ pub async fn find_by_id(
     Ok(order)
 }
 
+/// Fetch the oldest PENDING order that has not yet been submitted (FIFO persistent queue).
+pub async fn find_next_queued_pending(
+    pool: &PgPool,
+) -> Result<Option<ActivationOrder>, AppError> {
+    let order = sqlx::query_as::<_, ActivationOrder>(
+        "SELECT * FROM activation_orders
+         WHERE status = 'PENDING'
+           AND external_job_id IS NULL
+           AND (external_status IS NULL OR external_status = 'queued')
+         ORDER BY created_at ASC
+         LIMIT 1",
+    )
+    .fetch_optional(pool)
+    .await?;
+    Ok(order)
+}
+
+pub async fn mark_submit_failed(
+    pool: &PgPool,
+    order_id: Uuid,
+    reason: &str,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "UPDATE activation_orders
+         SET external_status = 'submit_failed',
+             admin_note = $1,
+             updated_at = NOW()
+         WHERE id = $2",
+    )
+    .bind(format!("Lỗi đẩy API tự động: {reason}"))
+    .bind(order_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 pub async fn set_external_job_started(
     pool: &PgPool,
     order_id: Uuid,

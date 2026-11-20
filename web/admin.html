@@ -540,10 +540,10 @@
             <div class="form-group">
               <label><i class="bx bx-transfer-alt"></i> Chế độ đẩy đơn hàng</label>
               <select id="cfgSmmAutoPush" style="width:100%;">
-                <option value="false">Đưa vào hàng chờ PENDING (Admin bấm đẩy thủ công)</option>
-                <option value="true">Tự động đẩy thẳng qua API ngay khi khách gửi form</option>
+                <option value="false">Đưa vào hàng chờ PENDING (Admin bấm đẩy thủ công / tick chọn)</option>
+                <option value="true">Tự động đưa vào hàng đợi &amp; đẩy từ từ qua API (3 giây/đơn)</option>
               </select>
-              <div class="form-hint">Khi bật tự động, khách sẽ thấy ngay bảng tiến trình 6 bước trực tiếp trên Telegram.</div>
+              <div class="form-hint">Khi bật tự động, đơn khách mua sẽ vào hàng đợi FIFO và tự đẩy từ từ qua API đối tác (vẫn bấm đẩy thủ công được khi cần).</div>
             </div>
 
             <div class="form-group">

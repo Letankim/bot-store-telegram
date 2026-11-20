@@ -9,6 +9,7 @@ use url::Url;
 use bot_store_telegram::{
     api, bot,
     config::{BotMode, Config},
+    services::smm_service,
     state::AppState,
 };
 
@@ -56,6 +57,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 5. Initialize Telegram Bot & Shared Application State
     let tg_bot = Bot::new(&config.telegram_bot_token);
     let state = AppState::new(pool, tg_bot.clone(), config.clone());
+
+    // 5.5 Start Background FIFO Queue Worker for automatic paced pushing to upstream API
+    smm_service::spawn_auto_queue_worker(state.clone());
 
     // 6. Configure Webhook or Launch Polling
     if config.bot_mode == BotMode::Webhook {

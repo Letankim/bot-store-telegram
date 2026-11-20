@@ -14,9 +14,8 @@ use crate::{
     crypto::verify_telegram_webapp_init_data,
     domain::{gemini_plan::GeminiPlan, wallet::format_vnd},
     error::AppError,
-    repo::{activation_repo, plan_repo, settings_repo, user_repo, wallet_repo},
+    repo::{plan_repo, settings_repo, user_repo, wallet_repo},
     response::ApiResponse,
-    services::smm_service,
     state::SharedState,
 };
 
@@ -139,59 +138,14 @@ pub async fn submit_activation(
         )
         .await?;
 
-    // Check if Admin enabled auto-push to upstream Pixel API (api.smm.io.vn)
-    let mut final_status = outcome.order.status.clone();
-    let mut auto_pushed_job: Option<i64> = None;
-    if let Ok(settings) = settings_repo::get_settings(&state.pool).await {
-        if settings.smm_auto_push && !settings.smm_api_key.trim().is_empty() {
-            match smm_service::submit_pixel_job(
-                &settings.smm_api_base_url,
-                &settings.smm_api_key,
-                &outcome.normalized.email,
-                &outcome.normalized.password,
-                &outcome.normalized.two_fa_compact_upper,
-                &outcome.plan.api_mode,
-            )
-            .await
-            {
-                Ok(job) => {
-                    let _ = activation_repo::set_external_job_started(
-                        &state.pool,
-                        outcome.order.id,
-                        job.job_id,
-                        &job.mode,
-                    )
-                    .await;
-                    final_status = "PROCESSING".to_string();
-                    auto_pushed_job = Some(job.job_id);
+    // Check whether auto-queue pushing is enabled (handled smoothly by background FIFO queue worker)
+    let auto_push_enabled = settings_repo::get_settings(&state.pool)
+        .await
+        .map(|s| s.smm_auto_push && !s.smm_api_key.trim().is_empty())
+        .unwrap_or(false);
 
-                    smm_service::spawn_live_job_tracker(
-                        state.clone(),
-                        outcome.order.id,
-                        outcome.order.order_code.clone(),
-                        outcome.user.telegram_id,
-                        outcome.normalized.email.clone(),
-                        job.job_id,
-                        job.position,
-                        job.mode,
-                        settings.smm_api_base_url,
-                        settings.smm_api_key,
-                    );
-                }
-                Err(err) => {
-                    tracing::error!(
-                        error = ?err,
-                        order_code = %outcome.order.order_code,
-                        "Auto-push to upstream Pixel API failed; order kept in PENDING queue"
-                    );
-                }
-            }
-        }
-    }
-
-    // Notify Customer via Telegram
-    let status_note = if auto_pushed_job.is_some() {
-        "🚀 Hệ thống đã tự động đẩy đơn xử lý — tiến trình 6 bước đang hiển thị trực tiếp bên dưới!"
+    let status_note = if auto_push_enabled {
+        "🚀 Đơn hàng đã vào hàng đợi tự động — hệ thống sẽ lần lượt đẩy xử lý sau vài giây và hiện tiến trình 6 bước ngay bên dưới!"
     } else {
         "⏳ Đơn hàng của bạn đã được tiếp nhận và sẽ sớm được xử lý. Nếu đơn lỗi, hệ thống sẽ hoàn 100% tiền về ví của bạn!"
     };
@@ -219,9 +173,13 @@ pub async fn submit_activation(
 
     // Notify Admin via Telegram with exact copy-ready format
     if let Some(admin_id) = state.config.admin_telegram_id {
-        let mode_line = match auto_pushed_job {
-            Some(jid) => format!("\n🚀 Đã tự động đẩy sang API (Job #{jid})"),
-            None => "\n📥 Trạng thái: Đang nằm trong hàng chờ (PENDING)".to_string(),
+        let mode_line = if auto_push_enabled {
+            format!(
+                "\n🚀 Hàng đợi tự động đang BẬT — sẽ tự đẩy sang API ({})",
+                outcome.plan.api_mode
+            )
+        } else {
+            "\n📥 Trạng thái: Đang nằm trong hàng chờ (PENDING)".to_string()
         };
         let admin_msg = format!(
             "🔔 <b>ĐƠN KÍCH HOẠT GEMINI PRO MỚI!</b>\n\
@@ -254,7 +212,7 @@ pub async fn submit_activation(
             gmail_masked: outcome.order.gmail_masked,
             price_paid_vnd: outcome.order.price_paid_vnd,
             remaining_balance_vnd: outcome.remaining_balance_vnd,
-            status: final_status,
+            status: outcome.order.status,
         },
         "Tạo đơn kích hoạt Gemini Pro thành công",
         ctx.request_id,

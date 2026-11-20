@@ -145,6 +145,104 @@ pub async fn submit_pixel_job(
     })
 }
 
+/// Background FIFO Queue Worker:
+/// When `app_settings.smm_auto_push` is enabled in `/admin`, continuously picks PENDING orders
+/// one-by-one every 3 seconds (rate-limit safe), pushes them to `api.smm.io.vn` with each plan's
+/// configured `api_mode`, and spawns the real-time 6-step Telegram progress tracker.
+pub fn spawn_auto_queue_worker(state: SharedState) {
+    tokio::spawn(async move {
+        tracing::info!("Started background SMM auto-push queue worker (3s pacing)");
+        loop {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+
+            let Ok(settings) = settings_repo::get_settings(&state.pool).await else {
+                continue;
+            };
+            if !settings.smm_auto_push || settings.smm_api_key.trim().is_empty() {
+                continue;
+            }
+
+            let Ok(Some(next_order)) = activation_repo::find_next_queued_pending(&state.pool).await
+            else {
+                continue;
+            };
+
+            let loaded = state
+                .activation_service
+                .load_decrypted_order(next_order.id)
+                .await;
+
+            let (order, creds, user_tg_id, plan_api_mode) = match loaded {
+                Ok(t) => t,
+                Err(err) => {
+                    tracing::error!(error = ?err, order_id = %next_order.id, "Queue worker failed to decrypt order");
+                    let _ = activation_repo::mark_submit_failed(
+                        &state.pool,
+                        next_order.id,
+                        &err.to_string(),
+                    )
+                    .await;
+                    continue;
+                }
+            };
+
+            match submit_pixel_job(
+                &settings.smm_api_base_url,
+                &settings.smm_api_key,
+                &creds.email,
+                &creds.password,
+                &creds.two_fa_compact_upper,
+                &plan_api_mode,
+            )
+            .await
+            {
+                Ok(job) => {
+                    tracing::info!(
+                        order_code = %order.order_code,
+                        job_id = job.job_id,
+                        mode = %job.mode,
+                        "Queue worker pushed order to upstream Pixel API"
+                    );
+                    let _ = activation_repo::set_external_job_started(
+                        &state.pool,
+                        order.id,
+                        job.job_id,
+                        &job.mode,
+                    )
+                    .await;
+
+                    if let Some(tg_id) = user_tg_id {
+                        spawn_live_job_tracker(
+                            state.clone(),
+                            order.id,
+                            order.order_code.clone(),
+                            tg_id,
+                            creds.email,
+                            job.job_id,
+                            job.position,
+                            job.mode,
+                            settings.smm_api_base_url,
+                            settings.smm_api_key,
+                        );
+                    }
+                }
+                Err(err) => {
+                    let err_str = err.to_string();
+                    tracing::warn!(
+                        order_code = %order.order_code,
+                        error = %err_str,
+                        "Queue worker submit failed; keeping order in PENDING for Admin review"
+                    );
+                    let _ = activation_repo::mark_submit_failed(&state.pool, order.id, &err_str)
+                        .await;
+                    // Back off a bit before checking next order
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                }
+            }
+        }
+    });
+}
+
 /// Spawn a background Tokio task to poll `GET /api/v2/pixel/status/{job_id}` and edit
 /// the customer's Telegram progress message in real time!
 #[allow(clippy::too_many_arguments)]
