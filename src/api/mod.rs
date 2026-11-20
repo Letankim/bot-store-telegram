@@ -27,6 +27,10 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/orders/{order_id}/refund", post(admin::refund_order))
         .route("/plans/{plan_id}", put(admin::update_plan))
         .route("/wallets/{telegram_id}/credit", post(admin::manual_credit_wallet))
+        .route("/users", get(admin::list_users))
+        .route("/users/{user_id}/wallet/adjust", post(admin::adjust_user_wallet))
+        .route("/users/{user_id}/ban", post(admin::toggle_user_ban))
+        .route("/users/{user_id}/transactions", get(admin::list_user_transactions))
         .route_layer(axum_mw::from_fn_with_state(
             state.clone(),
             middleware::require_admin_api_key,

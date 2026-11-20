@@ -15,9 +15,17 @@ use uuid::Uuid;
 use crate::{
     api::middleware::RequestContext,
     bot::{self, messages::escape_html},
-    domain::{gemini_plan::GeminiPlan, settings::AppSettings, wallet::format_vnd},
+    domain::{
+        gemini_plan::GeminiPlan,
+        settings::AppSettings,
+        wallet::{WalletTransaction, format_vnd},
+    },
     error::AppError,
-    repo::{activation_repo, plan_repo, settings_repo, user_repo, wallet_repo},
+    repo::{
+        activation_repo, plan_repo, settings_repo,
+        user_repo::{self, AdminUserWithWallet},
+        wallet_repo,
+    },
     response::{ApiResponse, PaginationMeta},
     services::{activation_service::AdminOrderView, smm_service},
     state::SharedState,
@@ -831,6 +839,189 @@ pub async fn manual_credit_wallet(
             balance_vnd: updated.balance_vnd,
         },
         "Cộng tiền ví thủ công thành công",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListUsersQuery {
+    pub search: Option<String>,
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+}
+
+/// List all users with wallet balances, order counts & referral counts for `/admin`.
+pub async fn list_users(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Query(q): Query<ListUsersQuery>,
+) -> Result<ApiResponse<Vec<AdminUserWithWallet>>, AppError> {
+    let page = q.page.unwrap_or(1).max(1);
+    let per_page = q.per_page.unwrap_or(30).clamp(1, 100);
+    let offset = i64::from((page - 1) * per_page);
+
+    let (users, total) = user_repo::list_users_with_wallets(
+        &state.pool,
+        q.search.as_deref(),
+        i64::from(per_page),
+        offset,
+    )
+    .await?;
+
+    let total_pages = ((total as f64) / (per_page as f64)).ceil() as u32;
+
+    Ok(ApiResponse::ok_paginated(
+        users,
+        "Lấy danh sách người dùng thành công",
+        ctx.request_id,
+        PaginationMeta {
+            page,
+            per_page,
+            total_items: total.max(0) as u64,
+            total_pages,
+        },
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AdjustWalletReq {
+    /// Positive to credit, negative to debit.
+    pub delta_vnd: i64,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AdjustWalletRes {
+    pub user_id: Uuid,
+    pub balance_vnd: i64,
+}
+
+/// Admin credit or debit any user's wallet with immutable ledger entry + Telegram notification.
+pub async fn adjust_user_wallet(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Path(user_id): Path<Uuid>,
+    Json(payload): Json<AdjustWalletReq>,
+) -> Result<ApiResponse<AdjustWalletRes>, AppError> {
+    if payload.delta_vnd == 0 {
+        return Err(AppError::Validation("Số tiền điều chỉnh phải khác 0.".to_string()));
+    }
+
+    let user = user_repo::find_by_id(&state.pool, user_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Không tìm thấy người dùng".to_string()))?;
+
+    let mut tx = state.pool.begin().await?;
+    let wallet = wallet_repo::lock_by_user_id(&mut tx, user.id).await?;
+    let idem_key = format!("admin_adj_{}", Uuid::new_v4().simple());
+    let desc = payload
+        .description
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("Admin điều chỉnh số dư ví")
+        .to_string();
+
+    let updated = if payload.delta_vnd > 0 {
+        wallet_repo::credit_wallet(
+            &mut tx,
+            &wallet,
+            payload.delta_vnd,
+            false,
+            "ADMIN_ADJUST",
+            &idem_key,
+            &desc,
+        )
+        .await?
+    } else {
+        wallet_repo::debit_wallet(
+            &mut tx,
+            &wallet,
+            payload.delta_vnd.abs(),
+            "ADMIN_ADJUST",
+            &idem_key,
+            &desc,
+        )
+        .await?
+    };
+
+    tx.commit().await?;
+
+    // Notify user on Telegram
+    let sign_txt = if payload.delta_vnd > 0 {
+        format!("+{} đ", format_vnd(payload.delta_vnd))
+    } else {
+        format!("-{} đ", format_vnd(payload.delta_vnd.abs()))
+    };
+    let tg_msg = format!(
+        "💰 <b>Cập nhật số dư ví từ quản trị viên</b>\n\n\
+         • Biến động: <b>{}</b>\n\
+         • Số dư hiện tại: <b>{} đ</b>\n\
+         • Ghi chú: <i>{}</i>",
+        sign_txt,
+        format_vnd(updated.balance_vnd),
+        escape_html(&desc)
+    );
+    let _ = state
+        .bot
+        .send_message(ChatId(user.telegram_id), tg_msg)
+        .parse_mode(ParseMode::Html)
+        .await;
+
+    Ok(ApiResponse::ok(
+        AdjustWalletRes {
+            user_id: user.id,
+            balance_vnd: updated.balance_vnd,
+        },
+        "Điều chỉnh số dư ví thành công",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ToggleBanReq {
+    pub is_banned: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ToggleBanRes {
+    pub user_id: Uuid,
+    pub is_banned: bool,
+}
+
+/// Ban or unban a user account.
+pub async fn toggle_user_ban(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Path(user_id): Path<Uuid>,
+    Json(payload): Json<ToggleBanReq>,
+) -> Result<ApiResponse<ToggleBanRes>, AppError> {
+    let updated = user_repo::set_user_banned(&state.pool, user_id, payload.is_banned).await?;
+    Ok(ApiResponse::ok(
+        ToggleBanRes {
+            user_id: updated.id,
+            is_banned: updated.is_banned,
+        },
+        if updated.is_banned {
+            "Đã khóa tài khoản người dùng"
+        } else {
+            "Đã mở khóa tài khoản người dùng"
+        },
+        ctx.request_id,
+    ))
+}
+
+/// Fetch recent immutable ledger transactions for a user's wallet.
+pub async fn list_user_transactions(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Path(user_id): Path<Uuid>,
+) -> Result<ApiResponse<Vec<WalletTransaction>>, AppError> {
+    let wallet = wallet_repo::get_by_user_id(&state.pool, user_id).await?;
+    let txs = wallet_repo::list_recent_transactions(&state.pool, wallet.id, 20).await?;
+    Ok(ApiResponse::ok(
+        txs,
+        "Lấy lịch sử giao dịch ví thành công",
         ctx.request_id,
     ))
 }
