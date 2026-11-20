@@ -168,6 +168,27 @@
       border-color: rgba(59, 130, 246, 0.35);
       color: #60a5fa;
     }
+    .nav-badge {
+      margin-left: auto;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 7px;
+      border-radius: 999px;
+      background: #ef4444;
+      color: #ffffff;
+      font-size: 0.74rem;
+      font-weight: 800;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.65);
+      animation: badgePulse 2s infinite;
+    }
+    @keyframes badgePulse {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+      70% { box-shadow: 0 0 0 7px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
 
     .sidebar-footer {
       margin-top: auto;
@@ -469,6 +490,7 @@
     </button>
     <button class="nav-btn" onclick="switchPane('orders', this)">
       <i class="bx bx-receipt"></i> Đơn kích hoạt
+      <span id="navPendingBadge" class="nav-badge">0</span>
     </button>
     <button class="nav-btn" onclick="switchPane('users', this)">
       <i class="bx bx-group"></i> Người dùng &amp; ví
@@ -936,9 +958,50 @@
   <script>
     let currentUsersPage = 1;
     let totalUsersPages = 1;
+    let lastPendingCount = null;
+    const BASE_TITLE = "Admin Console — Gemini Pro Store";
     const usersById = {};
     const ordersById = {};
     let pendingAdjust = { userId: null, sign: 1 };
+
+    function updatePendingIndicators(count) {
+      const n = Number(count || 0);
+      const kpi = document.getElementById("kpiPending");
+      const badge = document.getElementById("navPendingBadge");
+      if (kpi) kpi.textContent = n;
+      if (badge) {
+        if (n > 0) {
+          badge.textContent = n > 99 ? "99+" : String(n);
+          badge.style.display = "inline-flex";
+        } else {
+          badge.style.display = "none";
+        }
+      }
+      document.title = n > 0 ? `(${n}) ${BASE_TITLE}` : BASE_TITLE;
+    }
+
+    async function pollPendingOrdersCount() {
+      try {
+        const json = await apiFetch("/api/v1/admin/orders?status=PENDING&page=1&per_page=1");
+        if (!json || !json.success) return;
+        const count = Number(json.meta?.pagination?.total_items ?? (json.data?.length || 0));
+        const increased = lastPendingCount !== null && count > lastPendingCount;
+        lastPendingCount = count;
+        updatePendingIndicators(count);
+
+        if (increased) {
+          showToast(`Có đơn kích hoạt mới đang chờ duyệt (${count} đơn PENDING)!`);
+          const ordersPaneActive = document.getElementById("pane-orders")?.classList.contains("active");
+          const filterVal = document.getElementById("orderStatusFilter")?.value;
+          const anyChecked = document.querySelectorAll(".order-chk:checked").length > 0;
+          if (ordersPaneActive && filterVal === "PENDING" && !anyChecked) {
+            loadOrders();
+          }
+        }
+      } catch (e) {
+        // Silent retry on next interval
+      }
+    }
 
     function fmtVnd(n) { return Number(n || 0).toLocaleString("vi-VN") + " đ"; }
 
@@ -1338,7 +1401,9 @@
         return;
       }
       if (status === "PENDING") {
-        document.getElementById("kpiPending").textContent = json.meta?.pagination?.total_items ?? json.data.length;
+        const pendingTotal = Number(json.meta?.pagination?.total_items ?? json.data.length);
+        lastPendingCount = pendingTotal;
+        updatePendingIndicators(pendingTotal);
       }
       if (!json.data.length) {
         listEl.textContent = "Chưa có đơn hàng nào trong trạng thái này.";
@@ -1585,6 +1650,8 @@
     loadPlans();
     loadBotStatus();
     loadSmmInfo(false);
+    // Auto-poll pending orders every 10 seconds to update red sidebar badge & tab title
+    setInterval(pollPendingOrdersCount, 10000);
   </script>
 </body>
 </html>
