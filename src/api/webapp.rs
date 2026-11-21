@@ -98,7 +98,7 @@ pub struct SubmitActivationReq {
     pub email: String,
     pub password: String,
     pub two_fa_secret: String,
-    pub recovery_email: Option<String>,
+    pub backup_codes: Option<Vec<String>>,
 }
 
 #[derive(Debug, Serialize)]
@@ -134,7 +134,7 @@ pub async fn submit_activation(
             &payload.email,
             &payload.password,
             &payload.two_fa_secret,
-            payload.recovery_email.as_deref(),
+            payload.backup_codes.as_deref(),
         )
         .await?;
 

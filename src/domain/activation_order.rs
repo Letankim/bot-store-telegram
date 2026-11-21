@@ -30,15 +30,15 @@ pub struct ActivationOrder {
 
 /// Validated & normalized credentials formatted strictly as:
 /// `customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl`
-/// or with optional recovery email:
-/// `customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl | backup@gmail.com`
+/// or with optional 2-3 backup codes (8 digits each):
+/// `customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl | 12345678,98765432`
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NormalizedCredentials {
     pub email: String,
     pub password: String,
     pub two_fa_secret: String,
     pub two_fa_compact_upper: String,
-    pub recovery_email: Option<String>,
+    pub backup_codes: Vec<String>,
     pub formatted_line: String,
     pub gmail_masked: String,
 }
@@ -48,7 +48,7 @@ impl NormalizedCredentials {
         email: &str,
         password: &str,
         two_fa_raw: &str,
-        recovery_email_raw: Option<&str>,
+        backup_codes_raw: Option<&[String]>,
     ) -> Result<Self, AppError> {
         let email_clean = email.trim().to_lowercase();
         if !email_clean.contains('@')
@@ -89,22 +89,35 @@ impl NormalizedCredentials {
             ));
         }
 
-        let recovery_email = match recovery_email_raw.map(str::trim).filter(|s| !s.is_empty()) {
-            Some(rec) => {
-                let rec_lower = rec.to_lowercase();
-                if !rec_lower.contains('@')
-                    || !rec_lower.contains('.')
-                    || rec_lower.contains(' ')
-                    || rec_lower.contains('|')
-                {
-                    return Err(AppError::Validation(
-                        "Email dự phòng không đúng định dạng hợp lệ.".to_string(),
-                    ));
+        let mut backup_codes = Vec::new();
+        if let Some(raw_list) = backup_codes_raw {
+            for item in raw_list {
+                for sub in item.split([',', '\n', ';']) {
+                    let trimmed = sub.trim();
+                    if trimmed.is_empty() {
+                        continue;
+                    }
+                    // Google displays 8-digit backup codes as `1234 5678` — strip spaces/hyphens
+                    let digits: String = trimmed
+                        .chars()
+                        .filter(|c| !c.is_whitespace() && *c != '-')
+                        .collect();
+                    if digits.len() != 8 || !digits.chars().all(|c| c.is_ascii_digit()) {
+                        return Err(AppError::Validation(
+                            "Mỗi Backup Code phải gồm đúng 8 chữ số (ví dụ: 12345678).".to_string(),
+                        ));
+                    }
+                    backup_codes.push(digits);
                 }
-                Some(rec_lower)
             }
-            None => None,
-        };
+        }
+
+        if !backup_codes.is_empty() && !(2..=3).contains(&backup_codes.len()) {
+            return Err(AppError::Validation(
+                "Nếu nhập Backup Codes, vui lòng nhập từ 2 đến 3 mã (mỗi mã đúng 8 chữ số)."
+                    .to_string(),
+            ));
+        }
 
         let grouped_2fa = two_fa_clean
             .as_bytes()
@@ -113,9 +126,13 @@ impl NormalizedCredentials {
             .collect::<Vec<_>>()
             .join(" ");
 
-        let formatted_line = match &recovery_email {
-            Some(rec) => format!("{email_clean} | {password_clean} | {grouped_2fa} | {rec}"),
-            None => format!("{email_clean} | {password_clean} | {grouped_2fa}"),
+        let formatted_line = if backup_codes.is_empty() {
+            format!("{email_clean} | {password_clean} | {grouped_2fa}")
+        } else {
+            format!(
+                "{email_clean} | {password_clean} | {grouped_2fa} | {}",
+                backup_codes.join(",")
+            )
         };
         let gmail_masked = mask_gmail(&email_clean);
 
@@ -124,13 +141,13 @@ impl NormalizedCredentials {
             password: password_clean,
             two_fa_secret: grouped_2fa,
             two_fa_compact_upper: two_fa_clean.to_uppercase(),
-            recovery_email,
+            backup_codes,
             formatted_line,
             gmail_masked,
         })
     }
 
-    /// Parse back a decrypted line `email | pass | 2fa [| recovery_email]`.
+    /// Parse back a decrypted line `email | pass | 2fa [| code1,code2]`.
     pub fn parse_formatted(line: &str) -> Result<Self, AppError> {
         let parts: Vec<&str> = line.split('|').map(str::trim).collect();
         if parts.len() < 3 {
@@ -138,8 +155,13 @@ impl NormalizedCredentials {
                 "Dữ liệu tài khoản không đúng định dạng email | pass | 2fa".to_string(),
             ));
         }
-        let rec = parts.get(3).copied();
-        Self::build(parts[0], parts[1], parts[2], rec)
+        // Only parse part[3] as backup codes if it doesn't contain '@' (backward compatible with legacy recovery_email rows)
+        let backup_list: Option<Vec<String>> = parts
+            .get(3)
+            .copied()
+            .filter(|s| !s.is_empty() && !s.contains('@'))
+            .map(|s| vec![s.to_string()]);
+        Self::build(parts[0], parts[1], parts[2], backup_list.as_deref())
     }
 }
 
@@ -163,20 +185,34 @@ mod tests {
 
     #[test]
     fn test_normalize_credentials_exact_format() {
+        let codes = vec!["1234 5678".to_string(), "98765432".to_string()];
         let res = NormalizedCredentials::build(
             "  Customer1@gmail.com ",
             " abcxyz ",
             "YDWX-XCPO 4q4q zye5 fdpt ti3w ungl mggl",
-            Some("backup@gmail.com"),
+            Some(&codes),
         )
         .unwrap();
 
         assert_eq!(
             res.formatted_line,
-            "customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl | backup@gmail.com"
+            "customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl | 12345678,98765432"
         );
         assert_eq!(res.two_fa_compact_upper, "YDWXXCPO4Q4QZYE5FDPTTI3WUNGLMGGL");
+        assert_eq!(res.backup_codes, vec!["12345678", "98765432"]);
         assert_eq!(res.gmail_masked, "cus***1@gmail.com");
+    }
+
+    #[test]
+    fn test_reject_invalid_backup_code_count() {
+        let one_code = vec!["12345678".to_string()];
+        let err = NormalizedCredentials::build(
+            "customer1@gmail.com",
+            "abcxyz",
+            "ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl",
+            Some(&one_code),
+        );
+        assert!(err.is_err());
     }
 
     #[test]

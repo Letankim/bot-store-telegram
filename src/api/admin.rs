@@ -405,6 +405,7 @@ pub async fn push_order_to_api(
         &creds.email,
         &creds.password,
         &creds.two_fa_compact_upper,
+        &creds.backup_codes,
         mode,
     )
     .await?;
@@ -525,6 +526,7 @@ pub async fn batch_push_orders_to_api(
             &creds.email,
             &creds.password,
             &creds.two_fa_compact_upper,
+            &creds.backup_codes,
             &plan_api_mode,
         )
         .await

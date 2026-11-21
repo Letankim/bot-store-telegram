@@ -22,6 +22,8 @@ struct PixelSubmitBody<'a> {
     gmail: &'a str,
     password: &'a str,
     totp: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    backup_codes: Option<&'a [String]>,
     mode: &'a str,
 }
 
@@ -76,13 +78,15 @@ pub async fn fetch_partner_info(
     Ok(val)
 }
 
-/// Submit a single Gmail job to `POST /api/v2/pixel/submit`.
+/// Submit a single Gmail job to `POST /api/v2/pixel/submit` (including optional 2-3 8-digit backup_codes).
+#[allow(clippy::too_many_arguments)]
 pub async fn submit_pixel_job(
     base_url: &str,
     api_key: &str,
     gmail: &str,
     password: &str,
     totp_compact_upper: &str,
+    backup_codes: &[String],
     mode: &str,
 ) -> Result<SubmittedExternalJob, AppError> {
     if api_key.trim().is_empty() {
@@ -95,6 +99,11 @@ pub async fn submit_pixel_job(
         gmail,
         password,
         totp: totp_compact_upper,
+        backup_codes: if backup_codes.is_empty() {
+            None
+        } else {
+            Some(backup_codes)
+        },
         mode,
     };
 
@@ -192,6 +201,7 @@ pub fn spawn_auto_queue_worker(state: SharedState) {
                 &creds.email,
                 &creds.password,
                 &creds.two_fa_compact_upper,
+                &creds.backup_codes,
                 &plan_api_mode,
             )
             .await

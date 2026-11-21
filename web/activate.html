@@ -179,7 +179,7 @@
     }
     .help-tag:hover { text-decoration: underline; }
     .input-wrap { position: relative; }
-    input[type="text"], input[type="email"], input[type="password"] {
+    input[type="text"], input[type="email"], input[type="password"], textarea {
       width: 100%;
       padding: 11px 12px;
       border-radius: 10px;
@@ -191,10 +191,11 @@
       outline: none;
       transition: border-color 0.15s, box-shadow 0.15s;
     }
-    input:focus {
+    input:focus, textarea:focus {
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
     }
+    textarea { resize: vertical; line-height: 1.55; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important; font-size: 0.84rem !important; }
     .toggle-pass {
       position: absolute;
@@ -402,15 +403,20 @@
         </div>
       </div>
 
-      <!-- Recovery Email -->
+      <!-- Backup Codes -->
       <div class="field">
         <div class="field-label">
-          <span class="field-label-left"><i class="bx bx-mail-send"></i> 4. Email dự phòng (Khuyến nghị)</span>
-          <span class="help-tag" onclick="toggleHint('hintRec')">Tác dụng</span>
+          <span class="field-label-left"><i class="bx bx-shield-plus"></i> 4. Backup Codes <span style="font-size:0.72rem;font-weight:600;background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:6px;border:1px solid #e2e8f0;">tuỳ chọn</span></span>
+          <span class="help-tag" onclick="toggleHint('hintBackup')">Lấy ở đâu?</span>
         </div>
-        <input id="recoveryEmail" type="email" placeholder="backup@gmail.com (không bắt buộc)" autocomplete="off" />
-        <div id="hintRec" class="hint-box">
-          • Điền email khôi phục đã gắn trong Gmail (nếu có) để quá trình đăng nhập kích hoạt diễn ra trơn tru hơn nếu Google hỏi xác minh bảo mật.
+        <textarea id="backupCodes" class="mono" rows="3" placeholder="Mỗi code một dòng, VD:&#10;12345678&#10;98765432" autocomplete="off"></textarea>
+        <div style="font-size:0.76rem;color:var(--muted);margin-top:5px;">
+          <i class="bx bx-info-circle"></i> Mỗi dòng một mã, cần <strong>2–3 mã</strong>; mỗi mã gồm <strong>đúng 8 chữ số</strong> (nếu copy từ Google dạng <code>1234 5678</code> hệ thống tự chuẩn hóa).
+        </div>
+        <div id="backupStatus" style="display:none;margin-top:6px;font-size:0.79rem;font-weight:600;"></div>
+        <div id="hintBackup" class="hint-box">
+          • Vào cài đặt bảo mật Google &rarr; <strong>Xác minh 2 bước</strong> &rarr; chọn mục <strong>Mã dự phòng (Backup codes)</strong> &rarr; bấm <strong>Thiết lập / Tạo mã mới</strong>.<br/>
+          • Copy <strong>2 hoặc 3 mã</strong> gồm 8 chữ số dán vào đây (mỗi mã 1 dòng) để giúp hệ thống vượt bước xác minh mượt hơn khi Google yêu cầu mã dự phòng.
         </div>
       </div>
 
@@ -460,7 +466,8 @@
     const emailEl = document.getElementById("email");
     const passEl = document.getElementById("password");
     const twoFaEl = document.getElementById("twoFa");
-    const recEl = document.getElementById("recoveryEmail");
+    const backupEl = document.getElementById("backupCodes");
+    const backupStatusEl = document.getElementById("backupStatus");
     const quickPasteEl = document.getElementById("quickPaste");
     const previewBox = document.getElementById("previewBox");
     const submitBtn = document.getElementById("submitBtn");
@@ -499,12 +506,45 @@
       return clean.match(/.{1,4}/g)?.join(" ") || raw.trim();
     }
 
+    function parseBackupCodes(raw) {
+      const lines = raw.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+      const codes = [];
+      let hasInvalid = false;
+      for (const line of lines) {
+        const digits = line.replace(/[\s-]+/g, "");
+        if (/^\d{8}$/.test(digits)) {
+          codes.push(digits);
+        } else {
+          hasInvalid = true;
+        }
+      }
+      return { codes, hasInvalid };
+    }
+
     function updatePreview() {
       const e = emailEl.value.trim() || "customer1@gmail.com";
       const p = passEl.value.trim() || "abcxyz";
       const t = twoFaEl.value.trim() ? normalizeTwoFa(twoFaEl.value) : "ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl";
-      const r = recEl.value.trim();
-      previewBox.textContent = r ? `${e} | ${p} | ${t} | ${r}` : `${e} | ${p} | ${t}`;
+      const rawB = backupEl.value.trim();
+      const { codes, hasInvalid } = parseBackupCodes(rawB);
+
+      if (!rawB) {
+        backupStatusEl.style.display = "none";
+      } else if (hasInvalid) {
+        backupStatusEl.style.display = "block";
+        backupStatusEl.style.color = "var(--danger)";
+        backupStatusEl.innerHTML = '<i class="bx bx-error-circle"></i> Có mã chưa đúng định dạng (mỗi mã phải gồm đúng 8 chữ số).';
+      } else if (codes.length < 2 || codes.length > 3) {
+        backupStatusEl.style.display = "block";
+        backupStatusEl.style.color = "var(--warn)";
+        backupStatusEl.innerHTML = `<i class="bx bx-error"></i> Đang nhập ${codes.length} mã — nếu dùng Backup Codes cần đúng 2–3 mã.`;
+      } else {
+        backupStatusEl.style.display = "block";
+        backupStatusEl.style.color = "var(--ok)";
+        backupStatusEl.innerHTML = `<i class="bx bx-check-circle"></i> Hợp lệ (${codes.length} mã dự phòng 8 số)`;
+      }
+
+      previewBox.textContent = codes.length ? `${e} | ${p} | ${t} | ${codes.join(",")}` : `${e} | ${p} | ${t}`;
     }
 
     quickPasteEl.addEventListener("input", () => {
@@ -513,7 +553,9 @@
         emailEl.value = parts[0];
         passEl.value = parts[1];
         twoFaEl.value = normalizeTwoFa(parts[2]);
-        if (parts.length >= 4) recEl.value = parts[3];
+        if (parts.length >= 4) {
+          backupEl.value = parts[3].split(/[,;]+/).map(s => s.trim()).filter(Boolean).join("\n");
+        }
         updatePreview();
         refreshOtp();
       }
@@ -521,7 +563,7 @@
 
     emailEl.addEventListener("input", updatePreview);
     passEl.addEventListener("input", updatePreview);
-    recEl.addEventListener("input", updatePreview);
+    backupEl.addEventListener("input", updatePreview);
     twoFaEl.addEventListener("input", () => {
       updatePreview();
       refreshOtp();
@@ -631,6 +673,13 @@
     document.getElementById("activationForm").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       if (!canAfford) return;
+      const rawB = backupEl.value.trim();
+      const { codes: parsedBackupCodes, hasInvalid: badBackup } = parseBackupCodes(rawB);
+      if (rawB && (badBackup || parsedBackupCodes.length < 2 || parsedBackupCodes.length > 3)) {
+        showAlert("Backup Codes không hợp lệ: nếu nhập, vui lòng điền từ 2 đến 3 mã (mỗi mã đúng 8 chữ số).", "error");
+        return;
+      }
+
       submitBtn.disabled = true;
       submitBtn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> <span>Đang mã hóa &amp; gửi đơn...</span>';
 
@@ -646,7 +695,7 @@
             email: emailEl.value.trim(),
             password: passEl.value.trim(),
             two_fa_secret: normalizeTwoFa(twoFaEl.value),
-            recovery_email: recEl.value.trim() || null
+            backup_codes: parsedBackupCodes.length ? parsedBackupCodes : null
           })
         });
         const json = await res.json();

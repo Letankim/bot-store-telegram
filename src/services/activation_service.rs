@@ -70,9 +70,9 @@ impl ActivationService {
         email: &str,
         password: &str,
         two_fa_raw: &str,
-        recovery_email: Option<&str>,
+        backup_codes: Option<&[String]>,
     ) -> Result<SubmittedOrderOutcome, AppError> {
-        let normalized = NormalizedCredentials::build(email, password, two_fa_raw, recovery_email)?;
+        let normalized = NormalizedCredentials::build(email, password, two_fa_raw, backup_codes)?;
         let (ciphertext, nonce) = self.crypto.encrypt(&normalized.formatted_line)?;
 
         let user = user_repo::find_by_telegram_id(&self.pool, telegram_id)
