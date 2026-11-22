@@ -26,6 +26,7 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/orders/{order_id}/complete", post(admin::complete_order))
         .route("/orders/{order_id}/refund", post(admin::refund_order))
         .route("/plans/{plan_id}", put(admin::update_plan))
+        .route("/broadcast", post(admin::broadcast_announcement))
         .route("/wallets/{telegram_id}/credit", post(admin::manual_credit_wallet))
         .route("/users", get(admin::list_users))
         .route("/users/{user_id}/wallet/adjust", post(admin::adjust_user_wallet))

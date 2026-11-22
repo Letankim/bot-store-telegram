@@ -890,10 +890,11 @@ pub struct UpdatePlanReq {
     pub is_maintenance: Option<bool>,
     pub maintenance_note: Option<String>,
     pub notify_restock: Option<bool>,
+    pub notify_maintenance: Option<bool>,
 }
 
 /// Update full details of a Gemini Pro plan (name, price, stock, sold count, description, api_mode, status).
-/// Automatically broadcasts a "HÀNG MỚI VỪA LÊN KHO" notification to all users when stock increases.
+/// Automatically broadcasts restock or maintenance status notifications to all active users when enabled.
 pub async fn update_plan(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
@@ -908,10 +909,9 @@ pub async fn update_plan(
         }
     }
 
-    let previous_stock = plan_repo::find_by_id(&state.pool, plan_id)
-        .await?
-        .map(|p| p.available_stock)
-        .unwrap_or(0);
+    let previous = plan_repo::find_by_id(&state.pool, plan_id).await?;
+    let previous_stock = previous.as_ref().map(|p| p.available_stock).unwrap_or(0);
+    let previous_maintenance = previous.as_ref().map(|p| p.is_maintenance).unwrap_or(false);
 
     let updated = plan_repo::update_plan_full(
         &state.pool,
@@ -930,13 +930,62 @@ pub async fn update_plan(
     )
     .await?;
 
+    let maintenance_toggled = previous_maintenance != updated.is_maintenance;
+    let should_notify_maintenance = maintenance_toggled
+        && updated.is_active
+        && payload.notify_maintenance.unwrap_or(true);
+
     let added_qty = updated.available_stock - previous_stock;
-    let should_notify = added_qty > 0
+    let should_notify_restock = !should_notify_maintenance
+        && added_qty > 0
         && updated.is_active
         && !updated.is_maintenance
         && payload.notify_restock.unwrap_or(true);
 
-    if should_notify {
+    if should_notify_maintenance {
+        let state_bg = state.clone();
+        let plan_bg = updated.clone();
+        let is_starting_maint = updated.is_maintenance;
+        tokio::spawn(async move {
+            let Ok(tg_ids) = user_repo::list_all_active_telegram_ids(&state_bg.pool).await else {
+                return;
+            };
+            let total = tg_ids.len();
+            let (text, kb) = if is_starting_maint {
+                (
+                    bot::messages::maintenance_started_broadcast_message(&plan_bg),
+                    bot::keyboards::maintenance_broadcast_keyboard(),
+                )
+            } else {
+                (
+                    bot::messages::maintenance_ended_broadcast_message(&plan_bg),
+                    bot::keyboards::restock_broadcast_keyboard(&plan_bg.id.to_string()),
+                )
+            };
+
+            let mut sent_ok = 0usize;
+            for tg_id in tg_ids {
+                if state_bg
+                    .bot
+                    .send_message(ChatId(tg_id), &text)
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(kb.clone())
+                    .await
+                    .is_ok()
+                {
+                    sent_ok += 1;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+            }
+            tracing::info!(
+                plan_code = %plan_bg.code,
+                is_starting_maint,
+                sent_ok,
+                total,
+                "Finished maintenance status broadcast notification"
+            );
+        });
+    } else if should_notify_restock {
         let state_bg = state.clone();
         let plan_bg = updated.clone();
         tokio::spawn(async move {
@@ -969,7 +1018,11 @@ pub async fn update_plan(
         });
     }
 
-    let msg = if should_notify {
+    let msg = if should_notify_maintenance && updated.is_maintenance {
+        "Đã bật bảo trì gói và đang gửi thông báo bảo trì tới tất cả khách hàng!".to_string()
+    } else if should_notify_maintenance && !updated.is_maintenance {
+        "Đã tắt bảo trì gói và đang gửi thông báo mở bán lại tới tất cả khách hàng!".to_string()
+    } else if should_notify_restock {
         format!(
             "Đã cập nhật gói (+{added_qty} tồn kho) và đang gửi thông báo lên kho tới tất cả người dùng!"
         )
@@ -978,6 +1031,81 @@ pub async fn update_plan(
     };
 
     Ok(ApiResponse::ok(updated, msg, ctx.request_id))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BroadcastReq {
+    pub title: String,
+    pub content: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BroadcastRes {
+    pub target_users: usize,
+}
+
+/// Admin manually broadcasts a maintenance or general announcement to all active Telegram users.
+pub async fn broadcast_announcement(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Json(payload): Json<BroadcastReq>,
+) -> Result<ApiResponse<BroadcastRes>, AppError> {
+    let title = payload.title.trim();
+    let content = payload.content.trim();
+    if title.is_empty() || content.is_empty() {
+        return Err(AppError::Validation(
+            "Vui lòng nhập đầy đủ tiêu đề và nội dung thông báo.".to_string(),
+        ));
+    }
+
+    let tg_ids = user_repo::list_all_active_telegram_ids(&state.pool).await?;
+    let total = tg_ids.len();
+
+    let formatted = format!(
+        "<b>{}</b>\n\
+         ══════════════════════════\n\n\
+         {}",
+        escape_html(title),
+        escape_html(content),
+    );
+
+    let state_bg = state.clone();
+    tokio::spawn(async move {
+        let kb = bot::keyboards::maintenance_broadcast_keyboard();
+        let mut sent_ok = 0usize;
+        for tg_id in tg_ids {
+            if state_bg
+                .bot
+                .send_message(ChatId(tg_id), &formatted)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(kb.clone())
+                .await
+                .is_ok()
+            {
+                sent_ok += 1;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(40)).await;
+        }
+        if let Some(admin_id) = state_bg.config.admin_telegram_id {
+            let report = format!(
+                "📢 <b>[ADMIN] HOÀN TẤT GỬI THÔNG BÁO HÀNG LOẠT</b>\n\n\
+                 • Đã gửi thành công: <b>{sent_ok} / {total}</b> người dùng\n\n\
+                 📩 <b>Nội dung đã gửi:</b>\n\
+                 <blockquote>{formatted}</blockquote>"
+            );
+            let _ = state_bg
+                .bot
+                .send_message(ChatId(admin_id), report)
+                .parse_mode(ParseMode::Html)
+                .await;
+        }
+    });
+
+    Ok(ApiResponse::ok(
+        BroadcastRes { target_users: total },
+        format!("Đang gửi thông báo tới {total} người dùng hoạt động!"),
+        ctx.request_id,
+    ))
 }
 
 #[derive(Debug, Deserialize)]

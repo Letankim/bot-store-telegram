@@ -182,3 +182,11 @@ pub fn restock_broadcast_keyboard(plan_id: &str) -> InlineKeyboardMarkup {
         InlineKeyboardButton::callback("📋 Xem sản phẩm khác", "back:plans"),
     ]])
 }
+
+/// Inline keyboard attached to maintenance broadcast alerts.
+pub fn maintenance_broadcast_keyboard() -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![vec![
+        InlineKeyboardButton::callback("📋 Xem sản phẩm khác", "back:plans"),
+        InlineKeyboardButton::callback("⬅️ Menu chính", "back:home"),
+    ]])
+}

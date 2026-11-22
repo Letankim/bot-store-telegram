@@ -206,3 +206,34 @@ pub fn restock_broadcast_message(plan: &GeminiPlan, added_qty: i32) -> String {
         plan.available_stock,
     )
 }
+
+pub fn maintenance_started_broadcast_message(plan: &GeminiPlan) -> String {
+    let name = escape_html(&plan.name);
+    let note = if plan.maintenance_note.trim().is_empty() {
+        "Vui lòng thử lại sau."
+    } else {
+        plan.maintenance_note.trim()
+    };
+    format!(
+        "🔧 <b>THÔNG BÁO BẢO TRÌ DỊCH VỤ</b>\n\
+         ══════════════════════════\n\n\
+         📦 Sản phẩm: <b>{name}</b>\n\
+         📝 Nội dung: {}\n\n\
+         ⏳ Hệ thống sẽ thông báo ngay khi dịch vụ hoạt động trở lại. Cảm ơn bạn đã thông cảm!",
+        escape_html(note),
+    )
+}
+
+pub fn maintenance_ended_broadcast_message(plan: &GeminiPlan) -> String {
+    let name = escape_html(&plan.name);
+    format!(
+        "✅ <b>DỊCH VỤ ĐÃ BẢO TRÌ XONG &amp; MỞ BÁN LẠI</b>\n\
+         ══════════════════════════\n\n\
+         📦 Sản phẩm: <b>{name}</b>\n\
+         💵 Giá: <b>{}đ</b>\n\
+         📊 Kho hiện tại: <b>{} tài khoản</b>\n\n\
+         🚀 Bạn đã có thể đặt đơn ngay bây giờ!",
+        format_vnd(plan.price_vnd),
+        plan.available_stock,
+    )
+}
