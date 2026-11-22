@@ -303,17 +303,21 @@ pub fn spawn_live_job_tracker(
             0,
         );
 
-        let sent_msg = match state
-            .bot
-            .send_message(ChatId(user_telegram_id), &init_text)
-            .parse_mode(ParseMode::Html)
-            .await
-        {
-            Ok(m) => Some(m),
-            Err(err) => {
-                tracing::error!(error = ?err, "Failed to send initial live progress message");
-                None
+        let sent_msg = if user_telegram_id > 0 {
+            match state
+                .bot
+                .send_message(ChatId(user_telegram_id), &init_text)
+                .parse_mode(ParseMode::Html)
+                .await
+            {
+                Ok(m) => Some(m),
+                Err(err) => {
+                    tracing::error!(error = ?err, "Failed to send initial live progress message");
+                    None
+                }
             }
+        } else {
+            None
         };
 
         let mut last_rendered = init_text;
@@ -477,11 +481,13 @@ pub fn spawn_live_job_tracker(
                             format_vnd(new_bal),
                             escape_html(&reason),
                         );
-                        let _ = state
-                            .bot
-                            .send_message(ChatId(user_telegram_id), refund_msg)
-                            .parse_mode(ParseMode::Html)
-                            .await;
+                        if user_telegram_id > 0 {
+                            let _ = state
+                                .bot
+                                .send_message(ChatId(user_telegram_id), refund_msg)
+                                .parse_mode(ParseMode::Html)
+                                .await;
+                        }
                     }
                 }
 

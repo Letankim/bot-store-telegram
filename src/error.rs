@@ -36,6 +36,9 @@ pub enum AppError {
     #[error("{0}")]
     Maintenance(String),
 
+    #[error("{0}")]
+    TooManyRequests(String),
+
     #[error("Lỗi kết nối cổng thanh toán PayOS: {0}")]
     PaymentGateway(String),
 
@@ -59,6 +62,7 @@ impl AppError {
             }
             AppError::OutOfStock => (StatusCode::UNPROCESSABLE_ENTITY, "ERR_OUT_OF_STOCK"),
             AppError::Maintenance(_) => (StatusCode::SERVICE_UNAVAILABLE, "ERR_PLAN_MAINTENANCE"),
+            AppError::TooManyRequests(_) => (StatusCode::TOO_MANY_REQUESTS, "ERR_RATE_LIMITED"),
             AppError::PaymentGateway(_) => (StatusCode::BAD_GATEWAY, "ERR_PAYMENT_GATEWAY"),
             AppError::Config(_) | AppError::Database(_) | AppError::Internal(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "ERR_INTERNAL_SERVER")

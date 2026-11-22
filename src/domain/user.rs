@@ -7,6 +7,9 @@ use uuid::Uuid;
 pub struct User {
     pub id: Uuid,
     pub telegram_id: i64,
+    pub email: Option<String>,
+    #[serde(skip_serializing)]
+    pub password_hash: Option<String>,
     pub username: Option<String>,
     pub full_name: String,
     pub ref_code: String,

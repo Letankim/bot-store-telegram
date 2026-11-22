@@ -89,7 +89,7 @@ pub async fn payos_webhook(
     let outcome = state.payos_service.handle_webhook(payload).await?;
 
     if !outcome.already_processed {
-        if let Some(tg_id) = outcome.user_telegram_id {
+        if let Some(tg_id) = outcome.user_telegram_id.filter(|&id| id > 0) {
             let bonus_note = outcome
                 .referral_reward
                 .as_ref()
@@ -121,18 +121,20 @@ pub async fn payos_webhook(
         }
 
         if let Some(ref_reward) = outcome.referral_reward {
-            let msg = format!(
-                "🎉 <b>Bạn vừa nhận thưởng giới thiệu!</b>\n\n\
-                 👤 <b>{}</b> vừa hoàn tất lần nạp tiền đầu tiên.\n\
-                 💰 Đã cộng <b>+{} đ</b> vào ví của bạn!",
-                escape_html(&ref_reward.referred_user_name),
-                format_vnd(ref_reward.reward_vnd),
-            );
-            let _ = state
-                .bot
-                .send_message(ChatId(ref_reward.referrer_telegram_id), msg)
-                .parse_mode(ParseMode::Html)
-                .await;
+            if ref_reward.referrer_telegram_id > 0 {
+                let msg = format!(
+                    "🎉 <b>Bạn vừa nhận thưởng giới thiệu!</b>\n\n\
+                     👤 <b>{}</b> vừa hoàn tất lần nạp tiền đầu tiên.\n\
+                     💰 Đã cộng <b>+{} đ</b> vào ví của bạn!",
+                    escape_html(&ref_reward.referred_user_name),
+                    format_vnd(ref_reward.reward_vnd),
+                );
+                let _ = state
+                    .bot
+                    .send_message(ChatId(ref_reward.referrer_telegram_id), msg)
+                    .parse_mode(ParseMode::Html)
+                    .await;
+            }
         }
     }
 

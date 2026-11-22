@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gemini Pro Store — Kích hoạt Gemini Pro chính chủ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #f4f6fb;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --primary-soft: #eff6ff;
+      --ok: #059669;
+      --ok-soft: #ecfdf5;
+      --warn: #d97706;
+      --warn-soft: #fffbeb;
+      --err: #dc2626;
+      --err-soft: #fef2f2;
+      --shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* Header */
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 800;
+      font-size: 1.05rem;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .brand-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #2563eb, #059669);
+      color: #fff;
+      display: grid;
+      place-items: center;
+      font-size: 1.25rem;
+    }
+    .nav-tabs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .nav-tab {
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted);
+      padding: 8px 13px;
+      border-radius: 10px;
+      font-family: inherit;
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+    .nav-tab:hover { background: var(--surface-soft); color: var(--text); }
+    .nav-tab.active { background: var(--primary-soft); color: var(--primary); border-color: #bfdbfe; }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .wallet-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--ok-soft);
+      border: 1px solid #a7f3d0;
+      color: var(--ok);
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 15px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+      font-family: inherit;
+      font-size: 0.86rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-decoration: none;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-hover); }
+    .btn-ok { background: var(--ok); color: #fff; }
+    .btn-ok:hover:not(:disabled) { background: #047857; }
+    .btn-danger { background: var(--err); color: #fff; }
+    .btn-ghost { background: var(--surface); border-color: var(--border); color: var(--text); }
+    .btn-ghost:hover:not(:disabled) { background: var(--surface-soft); }
+
+    /* Main Container */
+    .container {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+
+    /* Hero */
+    .hero {
+      background: linear-gradient(135deg, #1e3a8a, #2563eb 60%, #059669);
+      color: #fff;
+      border-radius: 18px;
+      padding: 28px 26px;
+      margin-bottom: 24px;
+      box-shadow: 0 10px 30px rgba(37, 99, 235, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .hero h1 { font-size: 1.5rem; font-weight: 800; margin-bottom: 6px; }
+    .hero p { font-size: 0.92rem; opacity: 0.92; max-width: 640px; }
+    .hero-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    /* Panes & Cards */
+    .pane { display: none; }
+    .pane.active { display: block; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      margin-bottom: 18px;
+    }
+    .card-title {
+      font-size: 1.02rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    /* Plans Grid */
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 18px;
+    }
+    .plan-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .plan-card:hover { transform: translateY(-2px); border-color: #93c5fd; }
+    .plan-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 10px; }
+    .plan-name { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .plan-price {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--primary);
+      margin: 6px 0 10px;
+    }
+    .plan-meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+    .plan-desc {
+      font-size: 0.83rem;
+      color: #334155;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      white-space: pre-line;
+      margin-bottom: 16px;
+      max-height: 170px;
+      overflow-y: auto;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .badge-ok { background: var(--ok-soft); color: var(--ok); border: 1px solid #a7f3d0; }
+    .badge-warn { background: var(--warn-soft); color: var(--warn); border: 1px solid #fde68a; }
+    .badge-err { background: var(--err-soft); color: var(--err); border: 1px solid #fecaca; }
+    .badge-info { background: var(--primary-soft); color: var(--primary); border: 1px solid #bfdbfe; }
+
+    /* Forms */
+    .form-group { margin-bottom: 13px; }
+    .form-group label {
+      display: block;
+      font-size: 0.83rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 5px;
+    }
+    input[type="text"], input[type="email"], input[type="password"], input[type="number"], textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+    .hint { font-size: 0.77rem; color: var(--muted); margin-top: 4px; }
+
+    /* Modal */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      z-index: 100;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      background: var(--surface);
+      border-radius: 18px;
+      width: 100%;
+      max-width: 500px;
+      max-height: 92vh;
+      overflow-y: auto;
+      padding: 22px;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, 0.25);
+    }
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .modal-head h3 { font-size: 1.05rem; font-weight: 800; display: flex; align-items: center; gap: 7px; }
+
+    /* Lists */
+    .item-row {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+      background: var(--surface-soft);
+    }
+    .code-box {
+      background: #0f172a;
+      color: #38bdf8;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.82rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      word-break: break-all;
+      margin-top: 8px;
+    }
+
+    /* VietQR Box */
+    .qr-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 18px;
+      align-items: start;
+    }
+    .qr-panel {
+      text-align: center;
+      background: var(--surface-soft);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+    }
+    .qr-panel img {
+      max-width: 240px;
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: #fff;
+      padding: 8px;
+    }
+
+    /* Live OTP chip */
+    .otp-chip {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--ok-soft);
+      border: 1px solid #a7f3d0;
+      color: var(--ok);
+      border-radius: 10px;
+      padding: 8px 12px;
+      margin-top: 6px;
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    /* Toast */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 200;
+      background: #0f172a;
+      color: #fff;
+      padding: 11px 16px;
+      border-radius: 12px;
+      font-size: 0.86rem;
+      font-weight: 600;
+      box-shadow: 0 12px 30px rgba(15, 23, 42, 0.25);
+      display: none;
+      align-items: center;
+      gap: 8px;
+      max-width: 360px;
+    }
+
+    .quick-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      background: var(--surface-soft);
+      padding: 4px;
+      border-radius: 11px;
+      border: 1px solid var(--border);
+      margin-bottom: 16px;
+    }
+    .auth-tab {
+      border: none;
+      background: transparent;
+      padding: 8px;
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.86rem;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .auth-tab.active { background: var(--surface); color: var(--primary); box-shadow: 0 2px 6px rgba(15,23,42,0.08); }
+  </style>
+</head>
+<body>
+  <header class="navbar">
+    <div class="nav-inner">
+      <a class="brand" href="/">
+        <div class="brand-icon"><i class="bx bxs-diamond"></i></div>
+        <span>Gemini Pro Store</span>
+      </a>
+
+      <nav class="nav-tabs">
+        <button class="nav-tab active" data-pane="products" onclick="switchPane('products', this)">
+          <i class="bx bx-store"></i> Sản phẩm
+        </button>
+        <button class="nav-tab" data-pane="orders" onclick="switchPane('orders', this)">
+          <i class="bx bx-receipt"></i> Đơn hàng của tôi
+        </button>
+        <button class="nav-tab" data-pane="wallet" onclick="switchPane('wallet', this)">
+          <i class="bx bx-wallet"></i> Ví &amp; nạp tiền
+        </button>
+        <button class="nav-tab" data-pane="referral" onclick="switchPane('referral', this)">
+          <i class="bx bx-gift"></i> Mời bạn bè
+        </button>
+        <a class="nav-tab" href="/webapp/guide" target="_blank" rel="noopener">
+          <i class="bx bx-book-open"></i> Hướng dẫn 7 bước
+        </a>
+      </nav>
+
+      <div id="navGuest" class="nav-actions">
+        <button class="btn btn-ghost" onclick="openAuthModal('login')"><i class="bx bx-log-in"></i> Đăng nhập</button>
+        <button class="btn btn-primary" onclick="openAuthModal('register')"><i class="bx bx-user-plus"></i> Đăng ký</button>
+      </div>
+
+      <div id="navUser" class="nav-actions" style="display:none;">
+        <span class="wallet-pill" onclick="switchPane('wallet')" title="Bấm để nạp thêm tiền">
+          <i class="bx bx-wallet"></i> <span id="navBalance">0 đ</span>
+        </span>
+        <span id="navUserName" style="font-size:0.85rem;font-weight:600;color:var(--text);"></span>
+        <button class="btn btn-ghost" onclick="logoutWeb()" title="Đăng xuất"><i class="bx bx-log-out"></i></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <div>
+        <h1>Kích hoạt Gemini Pro chính chủ ngay trên Website</h1>
+        <p>Mua trực tiếp không cần cài Telegram — nạp tiền tự động bằng mã QR chuyển khoản ngân hàng (VietQR), theo dõi tiến trình kích hoạt trực tuyến và hoàn tiền 100% nếu đơn lỗi.</p>
+        <div class="hero-badges">
+          <span class="hero-badge"><i class="bx bx-shield-quarter"></i> Mã hóa AES-256-GCM</span>
+          <span class="hero-badge"><i class="bx bx-qr-scan"></i> VietQR tự động 24/7</span>
+          <span class="hero-badge"><i class="bx bx-support"></i> Hỗ trợ: <span id="heroSupport">@kim12ad</span></span>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a class="btn btn-ghost" href="/webapp/guide" target="_blank" rel="noopener" style="background:rgba(255,255,255,0.16);color:#fff;border-color:rgba(255,255,255,0.3);">
+          <i class="bx bx-book-open"></i> Xem hướng dẫn 2FA &amp; HSTT
+        </a>
+      </div>
+    </section>
+
+    <!-- PANE 1: PRODUCTS -->
+    <section id="pane-products" class="pane active">
+      <div id="plansGrid" class="plans-grid">
+        <div class="card">Đang tải danh sách gói dịch vụ...</div>
+      </div>
+    </section>
+
+    <!-- PANE 2: MY ORDERS -->
+    <section id="pane-orders" class="pane">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+          <div class="card-title" style="margin-bottom:0;"><i class="bx bx-receipt"></i> Đơn hàng kích hoạt của tôi</div>
+          <button class="btn btn-ghost" onclick="loadMyOrders()"><i class="bx bx-refresh"></i> Làm mới</button>
+        </div>
+        <div id="ordersContainer" style="color:var(--muted);font-size:0.9rem;">Vui lòng đăng nhập để xem đơn hàng của bạn.</div>
+      </div>
+    </section>
+
+    <!-- PANE 3: WALLET & VIETQR TOPUP -->
+    <section id="pane-wallet" class="pane">
+      <div class="qr-grid">
+        <div class="card">
+          <div class="card-title"><i class="bx bx-qr-scan"></i> Nạp tiền tự động qua VietQR</div>
+          <p style="font-size:0.84rem;color:var(--muted);margin-bottom:12px;">
+            Số tiền nạp tối thiểu: <strong id="minDepositTxt">10.000 đ</strong>. Tiền tự động cộng vào ví sau 5–30 giây kể từ khi chuyển khoản.
+          </p>
+          <div id="quickAmountsGrid" class="quick-grid"></div>
+          <div class="form-group">
+            <label>Hoặc nhập số tiền muốn nạp (VND)</label>
+            <input id="depositAmountInput" type="number" min="10000" step="1000" placeholder="VD: 50000" />
+          </div>
+          <button id="createQrBtn" class="btn btn-primary" style="width:100%;" onclick="createDepositQr()">
+            <i class="bx bx-qr"></i> Tạo mã QR chuyển khoản (VietQR)
+          </button>
+
+          <div id="activeQrBox" style="display:none;margin-top:16px;" class="qr-panel">
+            <div style="font-weight:700;margin-bottom:8px;color:var(--primary);">Quét mã VietQR bằng app Ngân hàng</div>
+            <img id="qrImg" src="" alt="Mã VietQR" />
+            <div style="text-align:left;font-size:0.84rem;margin-top:12px;display:grid;gap:5px;">
+              <div>Mã giao dịch: <strong id="qrOrderCode">--</strong></div>
+              <div>Số tiền: <strong id="qrAmount" style="color:var(--ok);">--</strong></div>
+              <div>Nội dung CK: <strong id="qrDesc" style="color:var(--primary);">--</strong></div>
+              <div id="qrBankRow" style="display:none;">STK: <strong id="qrAccNo">--</strong> (<span id="qrAccName">--</span>)</div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px;">
+              <button class="btn btn-ok" style="flex:1;" onclick="checkActiveDeposit()"><i class="bx bx-check-circle"></i> Tôi đã thanh toán</button>
+              <button class="btn btn-ghost" onclick="cancelActiveDeposit()"><i class="bx bx-x"></i> Hủy</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div class="card-title" style="margin-bottom:0;"><i class="bx bx-history"></i> Lịch sử giao dịch ví</div>
+            <button class="btn btn-ghost" onclick="loadWalletLedger()"><i class="bx bx-refresh"></i></button>
+          </div>
+          <div id="walletLedgerBox" style="font-size:0.86rem;color:var(--muted);">Vui lòng đăng nhập để xem lịch sử ví.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PANE 4: REFERRAL -->
+    <section id="pane-referral" class="pane">
+      <div class="card">
+        <div class="card-title"><i class="bx bx-gift"></i> Chương trình mời bạn bè nhận thưởng</div>
+        <div id="referralBox" style="font-size:0.9rem;color:var(--muted);">Vui lòng đăng nhập để lấy link giới thiệu của bạn.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- AUTH MODAL (LOGIN / REGISTER) -->
+  <div id="authModal" class="modal-backdrop" onclick="if(event.target===this) closeAuthModal()">
+    <div class="modal-box" style="max-width:430px;">
+      <div class="modal-head">
+        <h3><i class="bx bx-shield-quarter" style="color:var(--primary);"></i> Tài khoản khách hàng</h3>
+        <button class="btn btn-ghost" onclick="closeAuthModal()"><i class="bx bx-x"></i></button>
+      </div>
+      <div class="auth-tabs">
+        <button id="tabLoginBtn" class="auth-tab active" onclick="setAuthTab('login')">Đăng nhập</button>
+        <button id="tabRegBtn" class="auth-tab" onclick="setAuthTab('register')">Đăng ký mới</button>
+      </div>
+
+      <form id="loginForm" onsubmit="submitLogin(event)">
+        <div class="form-group">
+          <label>Email</label>
+          <input id="loginEmail" type="email" required placeholder="ban@gmail.com" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label>Mật khẩu</label>
+          <input id="loginPassword" type="password" required minlength="8" placeholder="Nhập mật khẩu..." autocomplete="current-password" />
+        </div>
+        <button id="loginSubmitBtn" type="submit" class="btn btn-primary" style="width:100%;">
+          <i class="bx bx-log-in"></i> Đăng nhập
+        </button>
+      </form>
+
+      <form id="registerForm" style="display:none;" onsubmit="submitRegister(event)">
+        <div class="form-group">
+          <label>Họ và tên</label>
+          <input id="regName" type="text" required minlength="2" placeholder="VD: Nguyễn Văn A" autocomplete="name" />
+        </div>
+        <div class="form-group">
+          <label>Email đăng nhập</label>
+          <input id="regEmail" type="email" required placeholder="ban@gmail.com" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label>Mật khẩu (tối thiểu 8 ký tự)</label>
+          <input id="regPassword" type="password" required minlength="8" placeholder="Tối thiểu 8 ký tự" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label>Mã giới thiệu (tuỳ chọn)</label>
+          <input id="regRefCode" type="text" placeholder="Để trống nếu không có" />
+        </div>
+        <button id="regSubmitBtn" type="submit" class="btn btn-ok" style="width:100%;">
+          <i class="bx bx-user-plus"></i> Tạo tài khoản ngay
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ORDER ACTIVATION MODAL -->
+  <div id="orderModal" class="modal-backdrop" onclick="if(event.target===this) closeOrderModal()">
+    <div class="modal-box" style="max-width:540px;">
+      <div class="modal-head">
+        <h3><i class="bx bx-bolt-circle" style="color:var(--primary);"></i> <span id="omTitle">Đặt đơn kích hoạt</span></h3>
+        <button class="btn btn-ghost" onclick="closeOrderModal()"><i class="bx bx-x"></i></button>
+      </div>
+
+      <div class="item-row" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div>
+          <div style="font-size:0.78rem;color:var(--muted);">Giá gói</div>
+          <strong id="omPrice" style="font-size:1.05rem;color:var(--primary);">-- đ</strong>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:0.78rem;color:var(--muted);">Số dư ví của bạn</div>
+          <strong id="omBalance" style="font-size:1.05rem;color:var(--ok);">-- đ</strong>
+        </div>
+      </div>
+
+      <div id="omLowBalBox" style="display:none;background:var(--warn-soft);border:1px solid #fde68a;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:0.84rem;color:var(--warn);">
+        Số dư ví chưa đủ để đặt gói này.
+        <button class="btn btn-primary" style="margin-top:8px;width:100%;" onclick="closeOrderModal(); switchPane('wallet');">
+          <i class="bx bx-qr-scan"></i> Nạp tiền VietQR ngay
+        </button>
+      </div>
+
+      <form id="orderForm" onsubmit="submitWebOrder(event)">
+        <div class="form-group">
+          <label>Dán nhanh chuỗi chuẩn (tuỳ chọn)</label>
+          <input id="omQuickPaste" type="text" placeholder="email@gmail.com | matkhau | 2fa_32_ky_tu" oninput="handleQuickPaste()" />
+        </div>
+        <div class="form-group">
+          <label>1. Địa chỉ Gmail cần kích hoạt</label>
+          <input id="omEmail" type="email" required placeholder="customer@gmail.com" />
+        </div>
+        <div class="form-group">
+          <label>2. Mật khẩu Gmail</label>
+          <input id="omPassword" type="password" required placeholder="Nhập mật khẩu Gmail" />
+        </div>
+        <div class="form-group">
+          <label>3. Khóa bí mật 2FA (32 ký tự Base32)</label>
+          <input id="omTwoFa" type="text" required placeholder="VD: ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl" oninput="refreshOrderOtp()" />
+          <div id="omOtpChip" class="otp-chip">
+            <span><i class="bx bx-check-shield"></i> Mã OTP 6 số đang khớp:</span>
+            <span id="omOtpCode" style="font-family:monospace;font-size:1rem;">--- ---</span>
+          </div>
+          <div class="hint">Không nhập mã OTP 6 số — hãy nhập khóa bí mật 32 ký tự (xem <a href="/webapp/guide" target="_blank" rel="noopener">hướng dẫn 7 bước</a>).</div>
+        </div>
+        <div class="form-group">
+          <label>4. Backup Codes (tuỳ chọn — 2 đến 3 mã 8 chữ số, mỗi dòng 1 mã)</label>
+          <textarea id="omBackupCodes" rows="3" placeholder="12345678&#10;98765432"></textarea>
+        </div>
+        <label style="display:flex;align-items:flex-start;gap:8px;font-size:0.82rem;color:#334155;margin-bottom:14px;cursor:pointer;">
+          <input id="omConfirmChk" type="checkbox" required style="width:17px;height:17px;margin-top:2px;accent-color:#2563eb;" />
+          <span>Tôi xác nhận đã đóng Hồ sơ thanh toán (HSTT) cũ, nhập đúng Mail | Pass | 2FA và đồng ý trừ tiền từ ví để kích hoạt.</span>
+        </label>
+        <button id="omSubmitBtn" type="submit" class="btn btn-ok" style="width:100%;">
+          <i class="bx bx-check-shield"></i> Xác nhận &amp; thanh toán ngay
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAINTENANCE NOTICE MODAL -->
+  <div id="maintModal" class="modal-backdrop" onclick="if(event.target===this) closeMaintModal()">
+    <div class="modal-box" style="max-width:420px;text-align:center;">
+      <div style="font-size:2.4rem;color:var(--warn);margin-bottom:8px;"><i class="bx bx-wrench"></i></div>
+      <h3 id="maintModalTitle" style="font-size:1.08rem;font-weight:800;margin-bottom:10px;">Dịch vụ đang bảo trì</h3>
+      <p id="maintModalBody" style="font-size:0.9rem;color:var(--muted);margin-bottom:18px;white-space:pre-line;">Vui lòng thử lại sau.</p>
+      <button class="btn btn-primary" style="width:100%;" onclick="closeMaintModal()">Đã hiểu</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"><i class="bx bx-info-circle"></i> <span id="toastText"></span></div>
+
+  <script>
+    let catalogPlans = [];
+    let storeSettings = null;
+    let currentUser = null;
+    let selectedPlan = null;
+    let activeDepositOrderCode = null;
+    let ordersPollTimer = null;
+
+    function esc(s) {
+      return String(s ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+    }
+    function fmtVnd(n) { return Number(n || 0).toLocaleString("vi-VN") + " đ"; }
+
+    function showToast(msg) {
+      const t = document.getElementById("toast");
+      document.getElementById("toastText").textContent = msg;
+      t.style.display = "flex";
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => { t.style.display = "none"; }, 3500);
+    }
+
+    function copyText(txt) {
+      navigator.clipboard.writeText(txt).then(() => showToast("Đã copy vào bộ nhớ tạm!"));
+    }
+
+    async function webApi(path, options = {}) {
+      const res = await fetch(path, {
+        ...options,
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+          ...(options.headers || {})
+        }
+      });
+      return res.json();
+    }
+
+    function switchPane(name, btn) {
+      document.querySelectorAll(".pane").forEach(p => p.classList.remove("active"));
+      document.querySelectorAll(".nav-tab[data-pane]").forEach(b => b.classList.remove("active"));
+      const paneEl = document.getElementById("pane-" + name);
+      if (paneEl) paneEl.classList.add("active");
+      const tabBtn = btn || document.querySelector(`.nav-tab[data-pane="${name}"]`);
+      if (tabBtn) tabBtn.classList.add("active");
+
+      if (name === "orders" && currentUser) loadMyOrders();
+      if (name === "wallet" && currentUser) loadWalletLedger();
+      if (name === "referral" && currentUser) loadMe();
+    }
+
+    function openAuthModal(mode) {
+      setAuthTab(mode || "login");
+      const urlRef = new URLSearchParams(window.location.search).get("ref");
+      if (urlRef) document.getElementById("regRefCode").value = urlRef;
+      document.getElementById("authModal").classList.add("open");
+    }
+    function closeAuthModal() { document.getElementById("authModal").classList.remove("open"); }
+
+    function setAuthTab(mode) {
+      const isLogin = mode === "login";
+      document.getElementById("tabLoginBtn").classList.toggle("active", isLogin);
+      document.getElementById("tabRegBtn").classList.toggle("active", !isLogin);
+      document.getElementById("loginForm").style.display = isLogin ? "block" : "none";
+      document.getElementById("registerForm").style.display = isLogin ? "none" : "block";
+    }
+
+    async function submitLogin(e) {
+      e.preventDefault();
+      const btn = document.getElementById("loginSubmitBtn");
+      btn.disabled = true;
+      const json = await webApi("/api/v1/web/auth/login", {
+        method: "POST",
+        body: JSON.stringify({
+          email: document.getElementById("loginEmail").value.trim(),
+          password: document.getElementById("loginPassword").value
+        })
+      });
+      btn.disabled = false;
+      if (!json.success) return showToast(json.message || "Đăng nhập thất bại");
+      showToast("Đăng nhập thành công!");
+      closeAuthModal();
+      await loadMe();
+      loadMyOrders();
+      loadWalletLedger();
+    }
+
+    async function submitRegister(e) {
+      e.preventDefault();
+      const btn = document.getElementById("regSubmitBtn");
+      btn.disabled = true;
+      const json = await webApi("/api/v1/web/auth/register", {
+        method: "POST",
+        body: JSON.stringify({
+          full_name: document.getElementById("regName").value.trim(),
+          email: document.getElementById("regEmail").value.trim(),
+          password: document.getElementById("regPassword").value,
+          ref_code: document.getElementById("regRefCode").value.trim() || null
+        })
+      });
+      btn.disabled = false;
+      if (!json.success) return showToast(json.message || "Đăng ký thất bại");
+      showToast("Tạo tài khoản thành công!");
+      closeAuthModal();
+      await loadMe();
+      loadMyOrders();
+      loadWalletLedger();
+    }
+
+    async function logoutWeb() {
+      await webApi("/api/v1/web/auth/logout", { method: "POST", body: "{}" });
+      currentUser = null;
+      renderAuthState();
+      showToast("Đã đăng xuất an toàn.");
+      switchPane("products");
+    }
+
+    function renderAuthState() {
+      const loggedIn = !!currentUser;
+      document.getElementById("navGuest").style.display = loggedIn ? "none" : "flex";
+      document.getElementById("navUser").style.display = loggedIn ? "flex" : "none";
+      if (loggedIn) {
+        document.getElementById("navBalance").textContent = fmtVnd(currentUser.balance_vnd);
+        document.getElementById("navUserName").textContent = currentUser.full_name;
+      } else {
+        document.getElementById("ordersContainer").textContent = "Vui lòng đăng nhập để xem đơn hàng của bạn.";
+        document.getElementById("walletLedgerBox").textContent = "Vui lòng đăng nhập để xem lịch sử ví.";
+        document.getElementById("referralBox").textContent = "Vui lòng đăng nhập để lấy link giới thiệu của bạn.";
+      }
+    }
+
+    async function loadCatalog() {
+      const json = await webApi("/api/v1/web/catalog");
+      if (!json.success) return;
+      catalogPlans = json.data.plans || [];
+      storeSettings = json.data.settings;
+
+      if (storeSettings) {
+        document.getElementById("heroSupport").textContent = storeSettings.support_handle;
+        document.getElementById("minDepositTxt").textContent = fmtVnd(storeSettings.min_deposit_vnd);
+        document.getElementById("depositAmountInput").min = storeSettings.min_deposit_vnd;
+        document.getElementById("quickAmountsGrid").innerHTML = (storeSettings.quick_deposit_amounts || [])
+          .map(amt => `<button class="btn btn-ghost" onclick="pickDepositAmount(${amt})">${fmtVnd(amt)}</button>`)
+          .join("");
+      }
+
+      const grid = document.getElementById("plansGrid");
+      if (!catalogPlans.length) {
+        grid.innerHTML = '<div class="card">Hiện chưa có gói dịch vụ nào đang mở bán.</div>';
+        return;
+      }
+
+      grid.innerHTML = catalogPlans.map(p => {
+        const badge = p.is_maintenance
+          ? '<span class="badge badge-warn"><i class="bx bx-wrench"></i> Đang bảo trì</span>'
+          : (p.available_stock > 0
+            ? `<span class="badge badge-ok"><i class="bx bx-check-circle"></i> Còn ${p.available_stock}</span>`
+            : '<span class="badge badge-err"><i class="bx bx-x-circle"></i> Hết hàng</span>');
+
+        const btnLabel = p.is_maintenance
+          ? '<i class="bx bx-wrench"></i> Đang bảo trì'
+          : (p.available_stock > 0
+            ? '<i class="bx bx-bolt-circle"></i> Mua &amp; kích hoạt ngay'
+            : '<i class="bx bx-x-circle"></i> Tạm hết hàng');
+
+        return `
+          <div class="plan-card">
+            <div>
+              <div class="plan-top">
+                <div class="plan-name">${esc(p.name)}</div>
+                ${badge}
+              </div>
+              <div class="plan-price">${fmtVnd(p.price_vnd)}</div>
+              <div class="plan-meta">
+                <span><i class="bx bx-time"></i> ${p.duration_months} tháng</span>
+                <span><i class="bx bx-package"></i> Kho: <strong>${p.available_stock}</strong></span>
+                <span><i class="bx bx-cart-alt"></i> Đã bán: <strong>${p.sold_count}</strong></span>
+              </div>
+              <div class="plan-desc">${esc(p.description_note)}</div>
+            </div>
+            <button class="btn ${p.is_maintenance ? 'btn-ghost' : 'btn-primary'}" style="width:100%;" onclick="clickBuyPlan('${p.id}')" ${!p.is_maintenance && p.available_stock <= 0 ? 'disabled' : ''}>
+              ${btnLabel}
+            </button>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function loadMe() {
+      try {
+        const json = await webApi("/api/v1/web/me");
+        if (!json.success) {
+          currentUser = null;
+          renderAuthState();
+          return;
+        }
+        currentUser = json.data.user;
+        renderAuthState();
+
+        const sum = json.data.referral_summary;
+        const refUrl = json.data.referral_url;
+        const r = storeSettings;
+        document.getElementById("referralBox").innerHTML = `
+          <div style="margin-bottom:12px;">Chia sẻ link giới thiệu bên dưới để nhận thưởng khi bạn bè đăng ký và nạp tiền lần đầu:</div>
+          <div class="code-box">
+            <span>${esc(refUrl)}</span>
+            <button class="btn btn-primary" onclick="copyText('${esc(refUrl)}')"><i class="bx bx-copy"></i> Copy link</button>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:16px;">
+            <div class="item-row">
+              <div style="font-size:0.78rem;color:var(--muted);">Tổng người đã mời</div>
+              <div style="font-size:1.25rem;font-weight:800;">${sum.total_invited}</div>
+            </div>
+            <div class="item-row">
+              <div style="font-size:0.78rem;color:var(--muted);">Đã nạp đầu (đã thưởng)</div>
+              <div style="font-size:1.25rem;font-weight:800;color:var(--ok);">${sum.rewarded_count}</div>
+            </div>
+            <div class="item-row">
+              <div style="font-size:0.78rem;color:var(--muted);">Đang chờ nạp đầu</div>
+              <div style="font-size:1.25rem;font-weight:800;color:var(--warn);">${sum.pending_count}</div>
+            </div>
+            <div class="item-row">
+              <div style="font-size:0.78rem;color:var(--muted);">Tổng thưởng đã nhận</div>
+              <div style="font-size:1.25rem;font-weight:800;color:var(--primary);">${fmtVnd(sum.total_earned_vnd)}</div>
+            </div>
+          </div>
+          ${r ? `<div class="hint" style="margin-top:8px;">Chính sách: Bạn nhận <strong>+${fmtVnd(r.referral_reward_vnd)}</strong>${r.referred_bonus_vnd > 0 ? ` và bạn mới nhận <strong>+${fmtVnd(r.referred_bonus_vnd)}</strong>` : ''} khi nạp đầu tối thiểu ${fmtVnd(r.referral_min_first_deposit_vnd)}.</div>` : ''}
+        `;
+      } catch (e) {
+        currentUser = null;
+        renderAuthState();
+      }
+    }
+
+    function closeMaintModal() { document.getElementById("maintModal").classList.remove("open"); }
+
+    function clickBuyPlan(planId) {
+      const plan = catalogPlans.find(p => p.id === planId);
+      if (!plan) return;
+      if (plan.is_maintenance) {
+        document.getElementById("maintModalTitle").textContent = `${plan.name} đang bảo trì`;
+        document.getElementById("maintModalBody").textContent = plan.maintenance_note || "Vui lòng thử lại sau.";
+        document.getElementById("maintModal").classList.add("open");
+        return;
+      }
+      if (!currentUser) {
+        showToast("Vui lòng đăng nhập hoặc đăng ký tài khoản để mua gói.");
+        openAuthModal("login");
+        return;
+      }
+      selectedPlan = plan;
+      document.getElementById("omTitle").textContent = plan.name;
+      document.getElementById("omPrice").textContent = fmtVnd(plan.price_vnd);
+      document.getElementById("omBalance").textContent = fmtVnd(currentUser.balance_vnd);
+      const lowBal = currentUser.balance_vnd < plan.price_vnd;
+      document.getElementById("omLowBalBox").style.display = lowBal ? "block" : "none";
+      document.getElementById("omSubmitBtn").disabled = lowBal;
+      document.getElementById("orderModal").classList.add("open");
+    }
+
+    function closeOrderModal() { document.getElementById("orderModal").classList.remove("open"); }
+
+    function handleQuickPaste() {
+      const raw = document.getElementById("omQuickPaste").value.trim();
+      if (!raw.includes("|")) return;
+      const parts = raw.split("|").map(s => s.trim());
+      if (parts[0]) document.getElementById("omEmail").value = parts[0];
+      if (parts[1]) document.getElementById("omPassword").value = parts[1];
+      if (parts[2]) {
+        document.getElementById("omTwoFa").value = parts[2];
+        refreshOrderOtp();
+      }
+      if (parts[3]) {
+        const codes = parts[3].split(/[\s,;]+/).filter(Boolean);
+        document.getElementById("omBackupCodes").value = codes.join("\n");
+      }
+    }
+
+    // Live 6-digit TOTP preview
+    async function computeTotp(secret) {
+      const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+      const cleaned = secret.toUpperCase().replace(/[\s-]+/g, "").replace(/=+$/, "");
+      if (cleaned.length < 16) return null;
+      let bits = "";
+      for (const ch of cleaned) {
+        const idx = alphabet.indexOf(ch);
+        if (idx === -1) return null;
+        bits += idx.toString(2).padStart(5, "0");
+      }
+      const bytes = new Uint8Array(Math.floor(bits.length / 8));
+      for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(bits.slice(i * 8, i * 8 + 8), 2);
+      const counter = Math.floor(Date.now() / 1000 / 30);
+      const buf = new ArrayBuffer(8);
+      const view = new DataView(buf);
+      view.setUint32(0, Math.floor(counter / 0x100000000), false);
+      view.setUint32(4, counter >>> 0, false);
+      const key = await crypto.subtle.importKey("raw", bytes, { name: "HMAC", hash: "SHA-1" }, false, ["sign"]);
+      const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, buf));
+      const offset = sig[sig.length - 1] & 0x0f;
+      const bin = ((sig[offset] & 0x7f) << 24) | ((sig[offset+1] & 0xff) << 16) | ((sig[offset+2] & 0xff) << 8) | (sig[offset+3] & 0xff);
+      return String(bin % 1000000).padStart(6, "0");
+    }
+
+    async function refreshOrderOtp() {
+      const chip = document.getElementById("omOtpChip");
+      const val = document.getElementById("omTwoFa").value.trim();
+      const code = val ? await computeTotp(val) : null;
+      if (!code) { chip.style.display = "none"; return; }
+      chip.style.display = "flex";
+      document.getElementById("omOtpCode").textContent = code.slice(0, 3) + " " + code.slice(3);
+    }
+
+    async function submitWebOrder(e) {
+      e.preventDefault();
+      if (!selectedPlan) return;
+      const rawCodes = document.getElementById("omBackupCodes").value
+        .split(/\r?\n/)
+        .map(s => s.replace(/\s+/g, "").trim())
+        .filter(Boolean);
+
+      const btn = document.getElementById("omSubmitBtn");
+      btn.disabled = true;
+      const json = await webApi("/api/v1/web/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          plan_id: selectedPlan.id,
+          email: document.getElementById("omEmail").value.trim(),
+          password: document.getElementById("omPassword").value,
+          two_fa_secret: document.getElementById("omTwoFa").value.trim(),
+          backup_codes: rawCodes.length ? rawCodes : null
+        })
+      });
+      btn.disabled = false;
+      if (!json.success) return showToast(json.message || "Không thể tạo đơn hàng");
+
+      showToast(`Đặt đơn #${json.data.order_code} thành công!`);
+      document.getElementById("orderForm").reset();
+      document.getElementById("omOtpChip").style.display = "none";
+      closeOrderModal();
+      await loadMe();
+      await loadCatalog();
+      switchPane("orders");
+      loadMyOrders();
+    }
+
+    async function loadMyOrders() {
+      if (!currentUser) return;
+      const box = document.getElementById("ordersContainer");
+      const json = await webApi("/api/v1/web/orders");
+      if (!json.success) {
+        box.innerHTML = `<span class="badge badge-err">${esc(json.message)}</span>`;
+        return;
+      }
+      const orders = json.data || [];
+      if (!orders.length) {
+        box.textContent = "Bạn chưa có đơn kích hoạt nào.";
+        clearInterval(ordersPollTimer);
+        ordersPollTimer = null;
+        return;
+      }
+
+      const hasActive = orders.some(o => o.status === "PENDING" || o.status === "PROCESSING");
+      if (hasActive && !ordersPollTimer) {
+        ordersPollTimer = setInterval(() => {
+          if (currentUser) loadMyOrders();
+        }, 5000);
+      } else if (!hasActive && ordersPollTimer) {
+        clearInterval(ordersPollTimer);
+        ordersPollTimer = null;
+      }
+
+      box.innerHTML = orders.map(o => {
+        const badgeCls = o.status === "COMPLETED" ? "badge-ok" : o.status === "REFUNDED" ? "badge-err" : "badge-warn";
+        const linkHtml = o.external_result && o.external_result.startsWith("http")
+          ? `<div class="code-box">
+               <span>${esc(o.external_result)}</span>
+               <div style="display:flex;gap:6px;flex-shrink:0;">
+                 <button class="btn btn-ghost" onclick="copyText('${esc(o.external_result)}')"><i class="bx bx-copy"></i></button>
+                 <a class="btn btn-ok" href="${esc(o.external_result)}" target="_blank" rel="noopener"><i class="bx bx-link-external"></i> Mở link</a>
+               </div>
+             </div>`
+          : "";
+
+        return `
+          <div class="item-row">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px;">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                <strong>#${esc(o.order_code)}</strong>
+                <span class="badge ${badgeCls}">${esc(o.status)}</span>
+                ${o.external_step ? `<span class="badge badge-info"><i class="bx bx-loader-alt"></i> ${esc(o.external_step)}</span>` : ''}
+              </div>
+              <strong style="color:var(--primary);">${fmtVnd(o.price_paid_vnd)}</strong>
+            </div>
+            <div style="font-size:0.85rem;">Gói: <strong>${esc(o.plan_name)}</strong> • Gmail: <code>${esc(o.gmail_masked)}</code></div>
+            ${o.admin_note ? `<div style="font-size:0.82rem;color:var(--muted);margin-top:4px;">Ghi chú: ${esc(o.admin_note)}</div>` : ''}
+            ${linkHtml}
+            <div style="font-size:0.75rem;color:var(--muted);margin-top:6px;">${new Date(o.created_at).toLocaleString("vi-VN")}</div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    function pickDepositAmount(amt) {
+      document.getElementById("depositAmountInput").value = amt;
+      createDepositQr();
+    }
+
+    async function createDepositQr() {
+      if (!currentUser) {
+        showToast("Vui lòng đăng nhập trước khi nạp tiền.");
+        openAuthModal("login");
+        return;
+      }
+      const amt = Number(document.getElementById("depositAmountInput").value);
+      if (!amt || amt <= 0) return showToast("Vui lòng nhập số tiền hợp lệ.");
+      const btn = document.getElementById("createQrBtn");
+      btn.disabled = true;
+      const json = await webApi("/api/v1/web/deposits", {
+        method: "POST",
+        body: JSON.stringify({ amount_vnd: amt })
+      });
+      btn.disabled = false;
+      if (!json.success) return showToast(json.message || "Không thể tạo mã QR");
+
+      const d = json.data;
+      activeDepositOrderCode = d.order_code;
+      document.getElementById("qrImg").src = d.qr_image_url;
+      document.getElementById("qrOrderCode").textContent = d.order_code;
+      document.getElementById("qrAmount").textContent = fmtVnd(d.amount_vnd);
+      document.getElementById("qrDesc").textContent = d.description;
+      if (d.account_number) {
+        document.getElementById("qrBankRow").style.display = "block";
+        document.getElementById("qrAccNo").textContent = d.account_number;
+        document.getElementById("qrAccName").textContent = d.account_name || "";
+      } else {
+        document.getElementById("qrBankRow").style.display = "none";
+      }
+      document.getElementById("activeQrBox").style.display = "block";
+      showToast("Đã tạo mã QR chuyển khoản!");
+    }
+
+    async function checkActiveDeposit() {
+      if (!activeDepositOrderCode) return;
+      const json = await webApi(`/api/v1/web/deposits/${activeDepositOrderCode}/check`, {
+        method: "POST",
+        body: "{}"
+      });
+      showToast(json.message || "Đã kiểm tra giao dịch");
+      if (json.success && json.data.status === "PAID") {
+        document.getElementById("activeQrBox").style.display = "none";
+        activeDepositOrderCode = null;
+        await loadMe();
+        loadWalletLedger();
+      }
+    }
+
+    async function cancelActiveDeposit() {
+      if (!activeDepositOrderCode) return;
+      const json = await webApi(`/api/v1/web/deposits/${activeDepositOrderCode}/cancel`, {
+        method: "POST",
+        body: "{}"
+      });
+      showToast(json.message || "Đã hủy giao dịch");
+      document.getElementById("activeQrBox").style.display = "none";
+      activeDepositOrderCode = null;
+    }
+
+    async function loadWalletLedger() {
+      if (!currentUser) return;
+      const box = document.getElementById("walletLedgerBox");
+      const json = await webApi("/api/v1/web/wallet/transactions");
+      if (!json.success) return;
+      const txs = json.data || [];
+      if (!txs.length) {
+        box.textContent = "Chưa có giao dịch ví nào.";
+        return;
+      }
+      box.innerHTML = txs.map(tx => `
+        <div class="item-row" style="padding:10px 12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+            <strong style="font-size:0.83rem;">${esc(tx.tx_type)}</strong>
+            <strong style="color:${tx.amount_vnd >= 0 ? 'var(--ok)' : 'var(--err)'};">${tx.amount_vnd >= 0 ? '+' : ''}${fmtVnd(tx.amount_vnd)}</strong>
+          </div>
+          <div style="font-size:0.8rem;color:var(--muted);margin-top:3px;">${esc(tx.description)}</div>
+          <div style="font-size:0.74rem;color:var(--muted);margin-top:3px;">Số dư: ${fmtVnd(tx.balance_before)} → <strong>${fmtVnd(tx.balance_after)}</strong> • ${new Date(tx.created_at).toLocaleString("vi-VN")}</div>
+        </div>
+      `).join("");
+    }
+
+    // Boot
+    (async () => {
+      await loadCatalog();
+      await loadMe();
+      const urlRef = new URLSearchParams(window.location.search).get("ref");
+      if (urlRef && !currentUser) openAuthModal("register");
+    })();
+  </script>
+</body>
+</html>

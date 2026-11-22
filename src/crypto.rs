@@ -4,11 +4,15 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
     aead::{Aead, KeyInit},
 };
+use argon2::{
+    Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
+};
 use chrono::Utc;
 use hmac::{Hmac, Mac};
-use rand::RngCore;
+use rand::{RngCore, rngs::OsRng};
 use serde::Deserialize;
-use sha2::Sha256;
+use sha2::{Digest, Sha256};
 use subtle::ConstantTimeEq;
 
 use crate::error::AppError;
@@ -199,6 +203,41 @@ pub fn verify_telegram_webapp_init_data(
         .map_err(|_| AppError::Unauthorized("Không thể đọc thông tin user từ initData".to_string()))
 }
 
+/// Hash a user password using Argon2id with a per-password cryptographic random salt.
+pub fn hash_password_argon2(password: &str) -> Result<String, AppError> {
+    let salt = SaltString::generate(&mut OsRng);
+    let argon2 = Argon2::default();
+    let hash = argon2
+        .hash_password(password.as_bytes(), &salt)
+        .map_err(|e| AppError::Internal(format!("Argon2 password hash error: {e}")))?
+        .to_string();
+    Ok(hash)
+}
+
+/// Verify a plaintext password against a stored Argon2id PHC hash string (constant-time).
+pub fn verify_password_argon2(password: &str, stored_hash: &str) -> bool {
+    let Ok(parsed) = PasswordHash::new(stored_hash) else {
+        return false;
+    };
+    Argon2::default()
+        .verify_password(password.as_bytes(), &parsed)
+        .is_ok()
+}
+
+/// Generate a 256-bit cryptographically random session token (64 lowercase hex chars).
+pub fn generate_session_token() -> String {
+    let mut bytes = [0u8; 32];
+    OsRng.fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
+
+/// Hash a raw session token with SHA-256 before storing or querying in PostgreSQL.
+pub fn sha256_hex(input: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,6 +251,14 @@ mod tests {
         assert_ne!(ct, secret.as_bytes());
         let decrypted = crypto.decrypt(&ct, &nonce).unwrap();
         assert_eq!(decrypted, secret);
+    }
+
+    #[test]
+    fn test_argon2id_password_roundtrip() {
+        let hash = hash_password_argon2("StrongPass!2026").unwrap();
+        assert!(hash.starts_with("$argon2id$"));
+        assert!(verify_password_argon2("StrongPass!2026", &hash));
+        assert!(!verify_password_argon2("WrongPass!2026", &hash));
     }
 
     #[test]

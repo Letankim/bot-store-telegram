@@ -1,3 +1,4 @@
+use serde::Serialize;
 use sqlx::{PgPool, Postgres, Transaction};
 use uuid::Uuid;
 
@@ -12,14 +13,14 @@ pub struct ReferralRewardResult {
     pub referred_new_balance_vnd: Option<i64>,
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, sqlx::FromRow)]
 pub struct InvitedFriendItem {
     pub full_name: String,
     pub status: String,
     pub reward_vnd: i64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ReferralSummary {
     pub total_invited: i64,
     pub rewarded_count: i64,

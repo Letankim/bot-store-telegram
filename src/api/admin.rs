@@ -1286,11 +1286,13 @@ pub async fn adjust_user_wallet(
         format_vnd(updated.balance_vnd),
         escape_html(&desc)
     );
-    let _ = state
-        .bot
-        .send_message(ChatId(user.telegram_id), tg_msg)
-        .parse_mode(ParseMode::Html)
-        .await;
+    if user.telegram_id > 0 {
+        let _ = state
+            .bot
+            .send_message(ChatId(user.telegram_id), tg_msg)
+            .parse_mode(ParseMode::Html)
+            .await;
+    }
 
     Ok(ApiResponse::ok(
         AdjustWalletRes {
@@ -1321,6 +1323,9 @@ pub async fn toggle_user_ban(
     Json(payload): Json<ToggleBanReq>,
 ) -> Result<ApiResponse<ToggleBanRes>, AppError> {
     let updated = user_repo::set_user_banned(&state.pool, user_id, payload.is_banned).await?;
+    if updated.is_banned {
+        let _ = user_repo::delete_all_user_sessions(&state.pool, user_id).await;
+    }
     Ok(ApiResponse::ok(
         ToggleBanRes {
             user_id: updated.id,

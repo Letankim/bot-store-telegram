@@ -42,6 +42,7 @@ pub async fn list_users_with_wallets(
              JOIN wallets w ON w.user_id = u.id
              WHERE u.full_name ILIKE $1
                 OR COALESCE(u.username, '') ILIKE $1
+                OR COALESCE(u.email, '') ILIKE $1
                 OR CAST(u.telegram_id AS TEXT) ILIKE $1
              ORDER BY u.created_at DESC
              LIMIT $2 OFFSET $3",
@@ -56,6 +57,7 @@ pub async fn list_users_with_wallets(
             "SELECT COUNT(*) FROM users u
              WHERE u.full_name ILIKE $1
                 OR COALESCE(u.username, '') ILIKE $1
+                OR COALESCE(u.email, '') ILIKE $1
                 OR CAST(u.telegram_id AS TEXT) ILIKE $1",
         )
         .bind(&like_pattern)
@@ -115,10 +117,126 @@ pub async fn get_users_summary(pool: &PgPool) -> Result<AdminUsersSummary, AppEr
 
 pub async fn list_all_active_telegram_ids(pool: &PgPool) -> Result<Vec<i64>, AppError> {
     let ids: Vec<(i64,)> =
-        sqlx::query_as("SELECT telegram_id FROM users WHERE is_banned = FALSE")
+        sqlx::query_as("SELECT telegram_id FROM users WHERE is_banned = FALSE AND telegram_id > 0")
             .fetch_all(pool)
             .await?;
     Ok(ids.into_iter().map(|(id,)| id).collect())
+}
+
+pub async fn find_by_email(pool: &PgPool, email_lower: &str) -> Result<Option<User>, AppError> {
+    let user = sqlx::query_as::<_, User>("SELECT * FROM users WHERE LOWER(email) = $1")
+        .bind(email_lower)
+        .fetch_optional(pool)
+        .await?;
+    Ok(user)
+}
+
+/// Create a new Web-only user (without Telegram) + Wallet + optional Referral in 1 ACID tx.
+/// Uses a unique negative `telegram_id` so Telegram broadcasts & queries stay cleanly separated.
+pub async fn create_web_user_with_wallet(
+    tx: &mut Transaction<'_, Postgres>,
+    email_lower: &str,
+    password_hash: &str,
+    full_name: &str,
+    referred_by: Option<Uuid>,
+    referral_reward_vnd: i64,
+    referred_bonus_vnd: i64,
+) -> Result<User, AppError> {
+    let web_tg_id: i64 = -(1_000_000_000_000_i64
+        + (rand::random::<u64>() % 7_999_999_999_999) as i64);
+    let ref_code = format!("W{}", &Uuid::new_v4().simple().to_string()[..7].to_uppercase());
+
+    let user = sqlx::query_as::<_, User>(
+        "INSERT INTO users (telegram_id, email, password_hash, username, full_name, ref_code, referred_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING *",
+    )
+    .bind(web_tg_id)
+    .bind(email_lower)
+    .bind(password_hash)
+    .bind(Some(email_lower))
+    .bind(full_name.trim())
+    .bind(&ref_code)
+    .bind(referred_by)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(|e| {
+        if let sqlx::Error::Database(db_err) = &e {
+            if db_err.is_unique_violation() {
+                return AppError::Conflict("Email này đã được đăng ký tài khoản.".to_string());
+            }
+        }
+        AppError::Database(e)
+    })?;
+
+    sqlx::query("INSERT INTO wallets (user_id, balance_vnd, total_deposited_vnd) VALUES ($1, 0, 0)")
+        .bind(user.id)
+        .execute(&mut **tx)
+        .await?;
+
+    if let Some(referrer_id) = referred_by {
+        sqlx::query(
+            "INSERT INTO referrals (referrer_id, referred_user_id, reward_vnd, referred_bonus_vnd, status)
+             VALUES ($1, $2, $3, $4, 'PENDING_FIRST_DEPOSIT')
+             ON CONFLICT (referred_user_id) DO NOTHING",
+        )
+        .bind(referrer_id)
+        .bind(user.id)
+        .bind(referral_reward_vnd)
+        .bind(referred_bonus_vnd)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    Ok(user)
+}
+
+pub async fn create_web_session(
+    pool: &PgPool,
+    user_id: Uuid,
+    token_hash: &str,
+    expires_at: DateTime<Utc>,
+) -> Result<(), AppError> {
+    sqlx::query(
+        "INSERT INTO web_sessions (user_id, token_hash, expires_at) VALUES ($1, $2, $3)",
+    )
+    .bind(user_id)
+    .bind(token_hash)
+    .bind(expires_at)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+pub async fn find_user_by_session_hash(
+    pool: &PgPool,
+    token_hash: &str,
+) -> Result<Option<User>, AppError> {
+    let user = sqlx::query_as::<_, User>(
+        "SELECT u.* FROM users u
+         JOIN web_sessions s ON s.user_id = u.id
+         WHERE s.token_hash = $1 AND s.expires_at > NOW()",
+    )
+    .bind(token_hash)
+    .fetch_optional(pool)
+    .await?;
+    Ok(user)
+}
+
+pub async fn delete_web_session(pool: &PgPool, token_hash: &str) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM web_sessions WHERE token_hash = $1")
+        .bind(token_hash)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+pub async fn delete_all_user_sessions(pool: &PgPool, user_id: Uuid) -> Result<(), AppError> {
+    sqlx::query("DELETE FROM web_sessions WHERE user_id = $1")
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    Ok(())
 }
 
 pub async fn set_user_banned(

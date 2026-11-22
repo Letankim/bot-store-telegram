@@ -74,9 +74,6 @@ impl ActivationService {
         two_fa_raw: &str,
         backup_codes: Option<&[String]>,
     ) -> Result<SubmittedOrderOutcome, AppError> {
-        let normalized = NormalizedCredentials::build(email, password, two_fa_raw, backup_codes)?;
-        let (ciphertext, nonce) = self.crypto.encrypt(&normalized.formatted_line)?;
-
         let user = user_repo::find_by_telegram_id(&self.pool, telegram_id)
             .await?
             .ok_or_else(|| {
@@ -84,6 +81,36 @@ impl ActivationService {
                     "Tài khoản chưa khởi tạo. Vui lòng gõ /start trong Bot trước.".to_string(),
                 )
             })?;
+
+        self.submit_activation_order_for_user(
+            user,
+            plan_id,
+            email,
+            password,
+            two_fa_raw,
+            backup_codes,
+        )
+        .await
+    }
+
+    /// Submit a new Gemini Pro activation order for an authenticated User (Web or Telegram).
+    pub async fn submit_activation_order_for_user(
+        &self,
+        user: User,
+        plan_id: Uuid,
+        email: &str,
+        password: &str,
+        two_fa_raw: &str,
+        backup_codes: Option<&[String]>,
+    ) -> Result<SubmittedOrderOutcome, AppError> {
+        if user.is_banned {
+            return Err(AppError::Forbidden(
+                "Tài khoản của bạn đã bị khóa, không thể đặt đơn.".to_string(),
+            ));
+        }
+
+        let normalized = NormalizedCredentials::build(email, password, two_fa_raw, backup_codes)?;
+        let (ciphertext, nonce) = self.crypto.encrypt(&normalized.formatted_line)?;
 
         let current_plan = plan_repo::find_by_id(&self.pool, plan_id)
             .await?

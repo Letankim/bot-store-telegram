@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod health;
 pub mod middleware;
+pub mod web_store;
 pub mod webapp;
 pub mod webhooks;
 
@@ -37,6 +38,18 @@ pub fn build_router(state: SharedState) -> Router {
             middleware::require_admin_api_key,
         ));
 
+    let web_auth_routes = Router::new()
+        .route("/me", get(web_store::web_me))
+        .route("/orders", get(web_store::web_list_orders).post(web_store::web_create_order))
+        .route("/deposits", post(web_store::web_create_deposit))
+        .route("/deposits/{order_code}/check", post(web_store::web_check_deposit))
+        .route("/deposits/{order_code}/cancel", post(web_store::web_cancel_deposit))
+        .route("/wallet/transactions", get(web_store::web_wallet_transactions))
+        .route_layer(axum_mw::from_fn_with_state(
+            state.clone(),
+            middleware::require_web_session,
+        ));
+
     let api_v1 = Router::new()
         .route("/health", get(health::health_check))
         .route("/webhooks/telegram", post(webhooks::telegram_webhook))
@@ -44,15 +57,22 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/webhooks/payos", post(webhooks::payos_webhook))
         .route("/webapp/me", get(webapp::webapp_me))
         .route("/webapp/activations", post(webapp::submit_activation))
+        .route("/web/catalog", get(web_store::get_catalog))
+        .route("/web/auth/register", post(web_store::web_register))
+        .route("/web/auth/login", post(web_store::web_login))
+        .route("/web/auth/logout", post(web_store::web_logout))
+        .nest("/web", web_auth_routes)
         .route("/admin/login", post(admin::admin_login))
         .route("/admin/logout", post(admin::admin_logout))
         .nest("/admin", admin_routes);
 
     Router::new()
+        .route("/", get(web_store::serve_store_page))
         .route("/admin", get(admin::serve_admin_page))
         .route("/webapp/activate", get(webapp::serve_activate_page))
         .route("/webapp/guide", get(webapp::serve_guide_page))
         .nest("/api/v1", api_v1)
+        .layer(axum_mw::from_fn(middleware::security_headers_middleware))
         .layer(axum_mw::from_fn(middleware::request_context_middleware))
         .layer(RequestBodyLimitLayer::new(1024 * 1024)) // 1MB max body
         .layer(CorsLayer::permissive())

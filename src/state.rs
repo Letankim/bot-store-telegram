@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
+    time::Instant,
 };
 
 use sqlx::PgPool;
@@ -39,6 +40,8 @@ pub struct AppState {
     pub admin_bot_sessions: RwLock<HashSet<i64>>,
     /// Tracks multi-step input actions on the dedicated Admin Bot.
     pub admin_bot_pending: RwLock<HashMap<i64, AdminBotPendingAction>>,
+    /// Sliding-window rate limiter for web auth endpoints (key = client IP / email).
+    pub web_auth_rate_limits: RwLock<HashMap<String, Vec<Instant>>>,
 }
 
 impl AppState {
@@ -58,6 +61,7 @@ impl AppState {
             awaiting_deposit_amount: RwLock::new(HashSet::new()),
             admin_bot_sessions: RwLock::new(HashSet::new()),
             admin_bot_pending: RwLock::new(HashMap::new()),
+            web_auth_rate_limits: RwLock::new(HashMap::new()),
         })
     }
 }
