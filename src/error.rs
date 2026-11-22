@@ -33,6 +33,9 @@ pub enum AppError {
     #[error("Gói dịch vụ hiện đã hết tồn kho.")]
     OutOfStock,
 
+    #[error("{0}")]
+    Maintenance(String),
+
     #[error("Lỗi kết nối cổng thanh toán PayOS: {0}")]
     PaymentGateway(String),
 
@@ -55,6 +58,7 @@ impl AppError {
                 (StatusCode::UNPROCESSABLE_ENTITY, "ERR_INSUFFICIENT_BALANCE")
             }
             AppError::OutOfStock => (StatusCode::UNPROCESSABLE_ENTITY, "ERR_OUT_OF_STOCK"),
+            AppError::Maintenance(_) => (StatusCode::SERVICE_UNAVAILABLE, "ERR_PLAN_MAINTENANCE"),
             AppError::PaymentGateway(_) => (StatusCode::BAD_GATEWAY, "ERR_PAYMENT_GATEWAY"),
             AppError::Config(_) | AppError::Database(_) | AppError::Internal(_) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "ERR_INTERNAL_SERVER")

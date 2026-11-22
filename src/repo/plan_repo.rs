@@ -47,7 +47,7 @@ pub async fn decrement_stock_and_increment_sold(
          SET available_stock = available_stock - 1,
              sold_count = sold_count + 1,
              updated_at = NOW()
-         WHERE id = $1 AND is_active = TRUE AND available_stock > 0
+         WHERE id = $1 AND is_active = TRUE AND is_maintenance = FALSE AND available_stock > 0
          RETURNING *",
     )
     .bind(plan_id)
@@ -121,6 +121,8 @@ pub async fn update_plan_full(
     api_mode: Option<&str>,
     display_order: Option<i32>,
     is_active: Option<bool>,
+    is_maintenance: Option<bool>,
+    maintenance_note: Option<&str>,
 ) -> Result<GeminiPlan, AppError> {
     let updated = sqlx::query_as::<_, GeminiPlan>(
         "UPDATE gemini_plans
@@ -133,8 +135,10 @@ pub async fn update_plan_full(
              api_mode = COALESCE($7, api_mode),
              display_order = COALESCE($8, display_order),
              is_active = COALESCE($9, is_active),
+             is_maintenance = COALESCE($10, is_maintenance),
+             maintenance_note = COALESCE($11, maintenance_note),
              updated_at = NOW()
-         WHERE id = $10
+         WHERE id = $12
          RETURNING *",
     )
     .bind(name.map(str::trim))
@@ -146,6 +150,8 @@ pub async fn update_plan_full(
     .bind(api_mode)
     .bind(display_order)
     .bind(is_active)
+    .bind(is_maintenance)
+    .bind(maintenance_note.map(str::trim))
     .bind(plan_id)
     .fetch_optional(pool)
     .await?

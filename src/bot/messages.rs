@@ -103,9 +103,14 @@ pub fn referral_dashboard_message(
 }
 
 pub fn gemini_plan_card(plan: &GeminiPlan, guide_url: &str, support_handle: &str) -> String {
+    let maintenance_line = if plan.is_maintenance {
+        "🔧 Trạng thái: <b>Đang bảo trì</b>\n"
+    } else {
+        ""
+    };
     format!(
         "🔹 <b>{}</b>\n\
-         💸 Giá: <b>{} đ</b>\n\
+         {}💸 Giá: <b>{} đ</b>\n\
          📦 Tồn kho: <b>{} tài khoản</b>\n\
          📊 Đã bán: <b>{} tài khoản</b>\n\n\
          <blockquote>✏️ <b>Mô tả:</b>\n\
@@ -115,12 +120,28 @@ pub fn gemini_plan_card(plan: &GeminiPlan, guide_url: &str, support_handle: &str
          Chỉ hỗ trợ refund với những đơn hàng lỗi.\n\
          Hỗ trợ: {}",
         escape_html(&plan.name),
+        maintenance_line,
         format_vnd(plan.price_vnd),
         plan.available_stock,
         plan.sold_count,
         escape_html(&plan.description_note),
         escape_html(guide_url),
         escape_html(support_handle)
+    )
+}
+
+pub fn plan_maintenance_message(plan: &GeminiPlan) -> String {
+    let note = if plan.maintenance_note.trim().is_empty() {
+        "Vui lòng thử lại sau."
+    } else {
+        plan.maintenance_note.trim()
+    };
+    format!(
+        "🔧 <b>{} đang bảo trì</b>\n\
+         ══════════════════════════\n\n\
+         {}",
+        escape_html(&plan.name),
+        escape_html(note),
     )
 }
 

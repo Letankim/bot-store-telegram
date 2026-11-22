@@ -33,10 +33,12 @@ pub fn plan_selector_keyboard(plans: &[GeminiPlan]) -> InlineKeyboardMarkup {
     let mut rows: Vec<Vec<InlineKeyboardButton>> = plans
         .iter()
         .map(|p| {
-            vec![InlineKeyboardButton::callback(
-                format!("🔹 {} — {} đ", p.name, format_vnd(p.price_vnd)),
-                format!("plan:{}", p.id),
-            )]
+            let label = if p.is_maintenance {
+                format!("🔧 {} (Bảo trì) — {} đ", p.name, format_vnd(p.price_vnd))
+            } else {
+                format!("🔹 {} — {} đ", p.name, format_vnd(p.price_vnd))
+            };
+            vec![InlineKeyboardButton::callback(label, format!("plan:{}", p.id))]
         })
         .collect();
     rows.push(vec![InlineKeyboardButton::callback(

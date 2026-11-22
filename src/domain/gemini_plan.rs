@@ -15,6 +15,8 @@ pub struct GeminiPlan {
     pub description_note: String,
     pub api_mode: String,
     pub is_active: bool,
+    pub is_maintenance: bool,
+    pub maintenance_note: String,
     pub display_order: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

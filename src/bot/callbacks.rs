@@ -90,6 +90,15 @@ pub async fn handle_callback(
             return Ok(());
         };
 
+        if plan.is_maintenance {
+            let text = messages::plan_maintenance_message(&plan);
+            bot.send_message(chat_id, text)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(keyboards::back_to_home_keyboard())
+                .await?;
+            return Ok(());
+        }
+
         if plan.available_stock <= 0 {
             bot.send_message(
                 chat_id,

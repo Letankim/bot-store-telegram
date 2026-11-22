@@ -1548,7 +1548,7 @@
               <i class="bx bxs-diamond" style="color:#60a5fa;"></i>
               <span>${escapeAttr(p.code)}</span>
             </div>
-            <span class="badge ${p.is_active ? 'badge-ok' : 'badge-err'}">${p.is_active ? 'Đang mở bán' : 'Đang tạm ẩn'}</span>
+            <span class="badge ${!p.is_active ? 'badge-err' : (p.is_maintenance ? 'badge-warn' : 'badge-ok')}">${!p.is_active ? 'Đang tạm ẩn' : (p.is_maintenance ? 'Đang bảo trì' : 'Đang mở bán')}</span>
           </div>
 
           <div class="form-grid">
@@ -1591,6 +1591,17 @@
                 <option value="false" ${!p.is_active ? 'selected' : ''}>Tạm ẩn khỏi Bot</option>
               </select>
             </div>
+            <div class="form-group">
+              <label>Chế độ bảo trì sản phẩm</label>
+              <select id="maint_${p.id}" style="width:100%;">
+                <option value="false" ${!p.is_maintenance ? 'selected' : ''}>Hoạt động bình thường (cho phép mua)</option>
+                <option value="true" ${p.is_maintenance ? 'selected' : ''}>Đang bảo trì (vẫn hiện, bấm mua báo bảo trì)</option>
+              </select>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Nội dung thông báo khi khách bấm mua lúc bảo trì</label>
+              <input id="maintnote_${p.id}" type="text" value="${escapeAttr(p.maintenance_note || 'Vui lòng thử lại sau.')}" placeholder="Vui lòng thử lại sau." />
+            </div>
             <div class="form-group" style="grid-column: 1 / -1;">
               <label>Mô tả chi tiết hiển thị trên Telegram</label>
               <textarea id="desc_${p.id}" rows="5">${escapeAttr(p.description_note)}</textarea>
@@ -1620,6 +1631,8 @@
         display_order: Number(document.getElementById("order_" + id).value),
         api_mode: document.getElementById("apimode_" + id).value,
         is_active: document.getElementById("active_" + id).value === "true",
+        is_maintenance: document.getElementById("maint_" + id).value === "true",
+        maintenance_note: document.getElementById("maintnote_" + id).value.trim() || "Vui lòng thử lại sau.",
         notify_restock: document.getElementById("notify_" + id)?.checked !== false,
         description_note: document.getElementById("desc_" + id).value.trim()
       };

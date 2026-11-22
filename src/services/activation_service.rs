@@ -53,6 +53,8 @@ pub struct SubmittedOrderOutcome {
 pub struct OrderActionOutcome {
     pub order: ActivationOrder,
     pub user_telegram_id: Option<i64>,
+    pub user_full_name: Option<String>,
+    pub plan_name: Option<String>,
     pub refunded_balance_vnd: Option<i64>,
 }
 
@@ -82,6 +84,22 @@ impl ActivationService {
                     "Tài khoản chưa khởi tạo. Vui lòng gõ /start trong Bot trước.".to_string(),
                 )
             })?;
+
+        let current_plan = plan_repo::find_by_id(&self.pool, plan_id)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Không tìm thấy gói dịch vụ.".to_string()))?;
+
+        if current_plan.is_maintenance {
+            let note = if current_plan.maintenance_note.trim().is_empty() {
+                "Vui lòng thử lại sau."
+            } else {
+                current_plan.maintenance_note.trim()
+            };
+            return Err(AppError::Maintenance(format!(
+                "{} đang bảo trì. {}",
+                current_plan.name, note
+            )));
+        }
 
         let mut tx = self.pool.begin().await?;
 
@@ -223,9 +241,14 @@ impl ActivationService {
         tx.commit().await?;
 
         let user = user_repo::find_by_id(&self.pool, updated.user_id).await?;
+        let plan_name = plan_repo::find_by_id(&self.pool, updated.plan_id)
+            .await?
+            .map(|p| p.name);
         Ok(OrderActionOutcome {
             order: updated,
-            user_telegram_id: user.map(|u| u.telegram_id),
+            user_telegram_id: user.as_ref().map(|u| u.telegram_id),
+            user_full_name: user.map(|u| u.full_name),
+            plan_name,
             refunded_balance_vnd: None,
         })
     }
@@ -265,9 +288,14 @@ impl ActivationService {
         tx.commit().await?;
 
         let user = user_repo::find_by_id(&self.pool, updated.user_id).await?;
+        let plan_name = plan_repo::find_by_id(&self.pool, updated.plan_id)
+            .await?
+            .map(|p| p.name);
         Ok(OrderActionOutcome {
             order: updated,
-            user_telegram_id: user.map(|u| u.telegram_id),
+            user_telegram_id: user.as_ref().map(|u| u.telegram_id),
+            user_full_name: user.map(|u| u.full_name),
+            plan_name,
             refunded_balance_vnd: Some(updated_wallet.balance_vnd),
         })
     }

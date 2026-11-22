@@ -788,23 +788,79 @@ pub async fn refund_order(
         .refund_failed_order(order_id, payload.reason.trim())
         .await?;
 
+    let new_bal = outcome.refunded_balance_vnd.unwrap_or(0);
+    let reason_clean = payload.reason.trim();
+    let plan_name = outcome
+        .plan_name
+        .as_deref()
+        .unwrap_or("Gemini Pro");
+
+    let customer_msg = format!(
+        "↩️ <b>Hoàn tiền 100% đơn hàng lỗi!</b>\n\n\
+         • Mã đơn: <code>{}</code>\n\
+         • Gói: <b>{}</b>\n\
+         • Gmail: <code>{}</code>\n\
+         • Số tiền hoàn lại ví: <b>+{} đ</b>\n\
+         • Số dư ví hiện tại: <b>{} đ</b>\n\
+         • Lý do: <i>{}</i>\n\n\
+         📘 Vui lòng kiểm tra lại hướng dẫn (/guide) trước khi đặt lại đơn mới nhé!",
+        outcome.order.order_code,
+        escape_html(plan_name),
+        escape_html(&outcome.order.gmail_masked),
+        format_vnd(outcome.order.price_paid_vnd),
+        format_vnd(new_bal),
+        escape_html(reason_clean),
+    );
+
+    let mut sent_to_customer = false;
     if let Some(tg_id) = outcome.user_telegram_id {
-        let new_bal = outcome.refunded_balance_vnd.unwrap_or(0);
-        let msg = format!(
-            "↩️ <b>Hoàn tiền 100% đơn hàng lỗi!</b>\n\n\
+        if state
+            .bot
+            .send_message(ChatId(tg_id), &customer_msg)
+            .parse_mode(ParseMode::Html)
+            .await
+            .is_ok()
+        {
+            sent_to_customer = true;
+        }
+    }
+
+    if let Some(admin_id) = state.config.admin_telegram_id {
+        let cust_name = outcome
+            .user_full_name
+            .as_deref()
+            .unwrap_or("Khách hàng");
+        let cust_tg_str = outcome
+            .user_telegram_id
+            .map(|id| id.to_string())
+            .unwrap_or_else(|| "N/A".to_string());
+        let delivery_status = if sent_to_customer {
+            "✅ Đã gửi tới khách thành công"
+        } else {
+            "⚠️ Chưa gửi được tới khách (khách có thể đã chặn bot)"
+        };
+
+        let admin_msg = format!(
+            "🛡️ <b>[ADMIN] ĐÃ HOÀN TIỀN ĐƠN HÀNG</b>\n\n\
              • Mã đơn: <code>{}</code>\n\
-             • Số tiền hoàn lại ví: <b>+{} đ</b>\n\
-             • Số dư ví hiện tại: <b>{} đ</b>\n\
-             • Lý do: <i>{}</i>\n\n\
-             📘 Vui lòng kiểm tra lại hướng dẫn (/guide) trước khi đặt lại đơn mới nhé!",
+             • Khách hàng: <b>{}</b> (ID: <code>{}</code>)\n\
+             • Gói: <b>{}</b>\n\
+             • Hoàn tiền: <b>+{} đ</b> (Số dư mới: <b>{} đ</b>)\n\
+             • Trạng thái gửi khách: {}\n\n\
+             📩 <b>Nội dung khách đã nhận:</b>\n\
+             <blockquote>{}</blockquote>",
             outcome.order.order_code,
+            escape_html(cust_name),
+            cust_tg_str,
+            escape_html(plan_name),
             format_vnd(outcome.order.price_paid_vnd),
             format_vnd(new_bal),
-            escape_html(payload.reason.trim()),
+            delivery_status,
+            customer_msg,
         );
         let _ = state
             .bot
-            .send_message(ChatId(tg_id), msg)
+            .send_message(ChatId(admin_id), admin_msg)
             .parse_mode(ParseMode::Html)
             .await;
     }
@@ -815,7 +871,7 @@ pub async fn refund_order(
             order_code: outcome.order.order_code,
             status: outcome.order.status,
         },
-        "Đã hoàn tiền 100% về ví khách hàng",
+        "Đã hoàn tiền 100% và gửi thông báo cho cả khách hàng & Admin",
         ctx.request_id,
     ))
 }
@@ -831,6 +887,8 @@ pub struct UpdatePlanReq {
     pub api_mode: Option<String>,
     pub display_order: Option<i32>,
     pub is_active: Option<bool>,
+    pub is_maintenance: Option<bool>,
+    pub maintenance_note: Option<String>,
     pub notify_restock: Option<bool>,
 }
 
@@ -867,11 +925,16 @@ pub async fn update_plan(
         payload.api_mode.as_deref(),
         payload.display_order,
         payload.is_active,
+        payload.is_maintenance,
+        payload.maintenance_note.as_deref(),
     )
     .await?;
 
     let added_qty = updated.available_stock - previous_stock;
-    let should_notify = added_qty > 0 && updated.is_active && payload.notify_restock.unwrap_or(true);
+    let should_notify = added_qty > 0
+        && updated.is_active
+        && !updated.is_maintenance
+        && payload.notify_restock.unwrap_or(true);
 
     if should_notify {
         let state_bg = state.clone();

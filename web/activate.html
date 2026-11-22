@@ -649,10 +649,14 @@
         document.getElementById("planName").textContent = d.plan.name;
         document.getElementById("planPrice").textContent = formatVnd(d.plan.price_vnd);
         document.getElementById("walletBalance").textContent = formatVnd(d.balance_vnd);
-        canAfford = d.balance_vnd >= d.plan.price_vnd && d.plan.available_stock > 0;
+        canAfford = !d.plan.is_maintenance && d.balance_vnd >= d.plan.price_vnd && d.plan.available_stock > 0;
 
         const statusEl = document.getElementById("balanceStatus");
-        if (d.plan.available_stock <= 0) {
+        if (d.plan.is_maintenance) {
+          statusEl.className = "status-chip err";
+          statusEl.innerHTML = '<i class="bx bx-wrench"></i> Đang bảo trì';
+          showAlert(`${d.plan.name} đang bảo trì. ${d.plan.maintenance_note || "Vui lòng thử lại sau."}`, "error");
+        } else if (d.plan.available_stock <= 0) {
           statusEl.className = "status-chip err";
           statusEl.innerHTML = '<i class="bx bx-x-circle"></i> Hết tồn kho';
         } else if (canAfford) {
