@@ -48,6 +48,38 @@ pub async fn telegram_webhook(
     ))
 }
 
+/// Dedicated Admin Bot Webhook endpoint (`POST /api/v1/webhooks/telegram-admin`).
+pub async fn telegram_admin_webhook(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    headers: HeaderMap,
+    Json(update): Json<Update>,
+) -> Result<ApiResponse<WebhookAck>, AppError> {
+    let secret = headers
+        .get("x-telegram-bot-api-secret-token")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    if !constant_time_eq_str(secret, &state.config.telegram_webhook_secret) {
+        return Err(AppError::Unauthorized(
+            "X-Telegram-Bot-Api-Secret-Token không hợp lệ.".to_string(),
+        ));
+    }
+
+    if let Some(admin_bot) = state.admin_bot.clone() {
+        let state_clone = state.clone();
+        tokio::spawn(async move {
+            bot::admin_bot::dispatch_update(admin_bot, update, state_clone).await;
+        });
+    }
+
+    Ok(ApiResponse::ok(
+        WebhookAck { received: true },
+        "Đã tiếp nhận Admin Bot Telegram update",
+        ctx.request_id,
+    ))
+}
+
 /// PayOS Payment Webhook endpoint (`POST /api/v1/webhooks/payos`).
 pub async fn payos_webhook(
     State(state): State<SharedState>,

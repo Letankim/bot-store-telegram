@@ -1,3 +1,4 @@
+pub mod admin_bot;
 pub mod callbacks;
 pub mod commands;
 pub mod keyboards;

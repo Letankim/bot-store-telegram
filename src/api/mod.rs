@@ -40,6 +40,7 @@ pub fn build_router(state: SharedState) -> Router {
     let api_v1 = Router::new()
         .route("/health", get(health::health_check))
         .route("/webhooks/telegram", post(webhooks::telegram_webhook))
+        .route("/webhooks/telegram-admin", post(webhooks::telegram_admin_webhook))
         .route("/webhooks/payos", post(webhooks::payos_webhook))
         .route("/webapp/me", get(webapp::webapp_me))
         .route("/webapp/activations", post(webapp::submit_activation))

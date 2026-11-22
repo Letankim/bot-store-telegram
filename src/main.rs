@@ -54,9 +54,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     sqlx::migrate!("./migrations").run(&pool).await?;
     tracing::info!("PostgreSQL migrations verified/applied successfully.");
 
-    // 5. Initialize Telegram Bot & Shared Application State
+    // 5. Initialize Telegram Bots (Customer Bot + optional dedicated Admin Bot) & Shared State
     let tg_bot = Bot::new(&config.telegram_bot_token);
-    let state = AppState::new(pool, tg_bot.clone(), config.clone());
+    let admin_bot = config.admin_bot_token.as_deref().map(Bot::new);
+    let state = AppState::new(pool, tg_bot.clone(), admin_bot.clone(), config.clone());
 
     // 5.5 Start Background FIFO Queue Worker for automatic paced pushing to upstream API
     smm_service::spawn_auto_queue_worker(state.clone());
@@ -71,12 +72,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .secret_token(config.telegram_webhook_secret.clone())
             .await?;
         tracing::info!(url = %webhook_url, "Registered Telegram Webhook successfully.");
+
+        if let Some(adm_bot) = admin_bot {
+            bot::admin_bot::register_commands(&adm_bot).await;
+            let admin_wh_url = format!("{}/api/v1/webhooks/telegram-admin", config.public_base_url);
+            let parsed_admin_url = Url::parse(&admin_wh_url)?;
+            adm_bot
+                .set_webhook(parsed_admin_url)
+                .secret_token(config.telegram_webhook_secret.clone())
+                .await?;
+            tracing::info!(url = %admin_wh_url, "Registered Admin Bot Telegram Webhook successfully.");
+        }
     } else {
         let polling_state = state.clone();
         tokio::spawn(async move {
             tracing::info!("Running Telegram Bot in long-polling mode...");
             bot::run_polling(polling_state).await;
         });
+
+        if let Some(adm_bot) = admin_bot {
+            let adm_state = state.clone();
+            tokio::spawn(async move {
+                tracing::info!("Running dedicated Admin Bot in long-polling mode...");
+                bot::admin_bot::run_polling(adm_bot, adm_state).await;
+            });
+        }
     }
 
     // 7. Launch Axum HTTP Server (API + PayOS Webhook + Mini App Form + Guide Page)

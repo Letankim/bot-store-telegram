@@ -17,6 +17,7 @@ pub struct Config {
     pub database_url: String,
     pub db_max_connections: u32,
     pub telegram_bot_token: String,
+    pub admin_bot_token: Option<String>,
     pub bot_mode: BotMode,
     pub telegram_webhook_secret: String,
     pub admin_telegram_id: Option<i64>,
@@ -53,6 +54,10 @@ impl Config {
             .map_err(|_| AppError::Config("DB_MAX_CONNECTIONS must be a valid u32".to_string()))?;
 
         let telegram_bot_token = required_var("TELEGRAM_BOT_TOKEN")?;
+        let admin_bot_token = env::var("ADMIN_BOT_TOKEN")
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
         let bot_mode = match env::var("BOT_MODE")
             .unwrap_or_else(|_| "polling".to_string())
             .to_lowercase()
@@ -102,6 +107,7 @@ impl Config {
             database_url,
             db_max_connections,
             telegram_bot_token,
+            admin_bot_token,
             bot_mode,
             telegram_webhook_secret,
             admin_telegram_id,
