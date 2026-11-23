@@ -1023,6 +1023,9 @@
       const s = String(raw || "").trim();
       if (!s) return "";
       const l = s.toLowerCase();
+      if (l.includes("2fa_timeout") || (l.includes("2fa") && l.includes("timeout"))) {
+        return "Hết thời gian chờ xác thực 2 bước (2FA) từ phía Google. Bạn có thể bấm Thử đẩy lại qua API.";
+      }
       if (l.includes("2fa_not_enabled") || l.includes("no_2fa") || l.includes("2fa_disabled")) {
         return "Tài khoản chưa bật xác thực 2 yếu tố (2FA) hoặc phương thức 2FA hiện tại chưa được hỗ trợ. Vui lòng bật 2FA bằng ứng dụng Authenticator theo hướng dẫn (/guide).";
       }
@@ -1546,6 +1549,7 @@
           ${o.status === "PENDING" || o.status === "PROCESSING" ? `
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
               ${o.status === "PENDING" ? `<button class="btn btn-primary" onclick="pushOrderApi('${o.id}')"><i class="bx bx-rocket"></i> Đẩy qua API (${o.plan_api_mode})</button>` : ''}
+              ${o.status === "PROCESSING" && isApiFailed ? `<button class="btn btn-primary" onclick="pushOrderApi('${o.id}')"><i class="bx bx-refresh"></i> Thử đẩy lại qua API (${o.plan_api_mode})</button>` : ''}
               <button class="btn btn-ok" onclick="completeOrder('${o.id}')"><i class="bx bx-check-double"></i> Hoàn tất &amp; báo khách</button>
               <button class="btn btn-danger" onclick="refundOrder('${o.id}')"><i class="bx bx-undo"></i> Hoàn tiền 100% đơn lỗi</button>
             </div>

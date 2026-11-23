@@ -368,7 +368,7 @@ pub fn spawn_live_job_tracker(
                 .map(str::to_string);
             let friendly_error_msg = raw_error_msg
                 .as_deref()
-                .map(translate_upstream_error);
+                .map(|r| translate_upstream_error(r, current_step.as_deref()));
 
             // Extract offer/result link (primary field from api.smm.io.vn is `extract_link`)
             let offer_link = extract_link_from_response(&val);
@@ -834,10 +834,19 @@ fn render_progress_card(
 
 /// Translate raw upstream error codes (such as `pixel_err_2fa_not_enabled`) into clear,
 /// customer-friendly Vietnamese without exposing internal provider keywords.
-pub fn translate_upstream_error(raw: &str) -> String {
+pub fn translate_upstream_error(raw: &str, current_step: Option<&str>) -> String {
     let trimmed = raw.trim();
     let lower = trimmed.to_lowercase();
+    let step_lower = current_step.unwrap_or("").to_lowercase();
+    let past_login = step_lower.contains("offer")
+        || step_lower.contains("claim")
+        || step_lower.contains("payment")
+        || step_lower.contains("profile")
+        || step_lower.contains("checkout");
 
+    if lower.contains("2fa_timeout") || (lower.contains("2fa") && lower.contains("timeout")) {
+        return "Hết thời gian chờ xác thực 2 bước (2FA) từ phía Google. Bạn có thể thử đẩy lại đơn.".to_string();
+    }
     if lower.contains("2fa_not_enabled") || lower.contains("no_2fa") || lower.contains("2fa_disabled") {
         return "Tài khoản chưa bật xác thực 2 yếu tố (2FA) hoặc phương thức 2FA hiện tại chưa được hỗ trợ. Vui lòng bật 2FA bằng ứng dụng Authenticator theo hướng dẫn (/guide).".to_string();
     }
@@ -845,6 +854,9 @@ pub fn translate_upstream_error(raw: &str) -> String {
         return "Sai mật khẩu Gmail. Vui lòng kiểm tra lại mật khẩu chính xác trước khi đặt lại.".to_string();
     }
     if lower.contains("totp") || lower.contains("2fa_invalid") || lower.contains("wrong_2fa") || lower.contains("invalid_otp") || lower.contains("wrong_otp") || lower.contains("2fa_failed") {
+        if past_login {
+            return "Google yêu cầu xác thực lại 2 bước ở bước kiểm tra ưu đãi nhưng bị gián đoạn. Vui lòng thử đẩy lại đơn.".to_string();
+        }
         return "Khóa bí mật 2FA (32 ký tự) không chính xác hoặc không khớp với tài khoản Gmail.".to_string();
     }
     if lower.contains("backup_code") {

@@ -386,9 +386,14 @@ pub async fn push_order_to_api(
         .load_decrypted_order(order_id)
         .await?;
 
-    if order.status != "PENDING" {
+    let can_retry_failed = order.status == "PROCESSING"
+        && matches!(
+            order.external_status.as_deref(),
+            Some("failed") | Some("cancelled")
+        );
+    if order.status != "PENDING" && !can_retry_failed {
         return Err(AppError::Conflict(format!(
-            "Đơn {} đang ở trạng thái {}, chỉ có thể đẩy đơn PENDING sang API.",
+            "Đơn {} đang ở trạng thái {}, chỉ có thể đẩy đơn PENDING hoặc đơn PROCESSING bị API báo lỗi.",
             order.order_code, order.status
         )));
     }
