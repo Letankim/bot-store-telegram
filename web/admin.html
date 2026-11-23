@@ -1041,8 +1041,11 @@
       if (l.includes("disabled") || l.includes("suspended") || l.includes("locked") || l.includes("banned")) {
         return "Tài khoản Gmail đang bị Google tạm khóa hoặc vô hiệu hóa.";
       }
-      if (l.includes("captcha") || l.includes("phone") || l.includes("sms") || l.includes("challenge") || l.includes("recovery")) {
-        return "Google yêu cầu xác minh bổ sung (số điện thoại / thiết bị tin cậy / captcha) nên hệ thống không thể đăng nhập tự động.";
+      if (l.includes("spam") || l.includes("captcha") || l.includes("recaptcha") || l.includes("bot")) {
+        return "Tài khoản yêu cầu xác thực thông tin Captcha, phát hiện dấu hiệu spam. Google yêu cầu xác minh thêm. Vui lòng đổi tài khoản Gmail khác hoặc thử lại sau.";
+      }
+      if (l.includes("phone") || l.includes("sms") || l.includes("challenge") || l.includes("recovery")) {
+        return "Google yêu cầu xác minh bổ sung (số điện thoại / thiết bị tin cậy) nên hệ thống không thể đăng nhập tự động.";
       }
       if (l.includes("already") || l.includes("subscribed") || l.includes("existing_plan")) {
         return "Tài khoản Gmail này đã hoặc đang sử dụng gói Google One / Gemini Pro.";

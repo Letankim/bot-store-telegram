@@ -300,6 +300,7 @@ pub fn spawn_live_job_tracker(
             None,
             None,
             None,
+            None,
             0,
         );
 
@@ -389,6 +390,7 @@ pub fn spawn_live_job_tracker(
                 current_step.as_deref(),
                 offer_link.as_deref(),
                 friendly_error_msg.as_deref(),
+                raw_error_msg.as_deref(),
                 elapsed_secs,
             );
 
@@ -610,35 +612,102 @@ pub fn extract_link_from_response(val: &serde_json::Value) -> Option<String> {
     None
 }
 
-fn step_index_from_name(step: Option<&str>) -> usize {
+fn resolve_step_index(
+    mode: &str,
+    step: Option<&str>,
+    raw_error: Option<&str>,
+) -> usize {
+    // 1. If the upstream returned a specific error code, infer the exact failing step from it first
+    if let Some(err) = raw_error {
+        let e = err.to_lowercase();
+        if e.contains("spam") || e.contains("captcha") || e.contains("recaptcha") || e.contains("bot") {
+            return 2;
+        }
+        if e.contains("not_found") || e.contains("invalid_email") || e.contains("no_account") {
+            return 1;
+        }
+        if e.contains("password") {
+            return 3;
+        }
+        if e.contains("2fa") || e.contains("totp") || e.contains("otp") || e.contains("backup_code") {
+            return 4;
+        }
+        if e.contains("payment_profile") || e.contains("hstt") || e.contains("country") {
+            return 5;
+        }
+        if e.contains("add_payment") || e.contains("paysafe") || e.contains("card") {
+            return if mode == "extract" { 5 } else { 6 };
+        }
+        if e.contains("ineligible")
+            || e.contains("not_eligible")
+            || e.contains("no_offer")
+            || e.contains("already")
+            || e.contains("subscribed")
+            || e.contains("family")
+        {
+            return if mode == "extract" { 5 } else { 7 };
+        }
+    }
+
+    // 2. Otherwise map from `current_step` string
     let Some(s) = step else {
         return 0;
     };
     let lower = s.to_lowercase();
-    if lower.contains("add payment")
-        || lower.contains("claim")
-        || lower.contains("autopay")
-        || lower.contains("payadd")
-        || lower.contains("extract")
-        || lower.contains("finish")
-        || lower.contains("done")
-        || lower.contains("completed")
-    {
-        6
-    } else if lower.contains("payment profile")
-        || lower.contains("offer")
-        || lower.contains("pixel")
-        || lower.contains("eligib")
-    {
-        5
-    } else if lower.contains("2fa") || lower.contains("totp") || lower.contains("otp") || lower.contains("verify") {
-        4
-    } else if lower.contains("pass") || lower.contains("login") {
-        3
-    } else if lower.contains("spam") || lower.contains("captcha") {
-        2
+
+    if mode == "extract" {
+        if lower.contains("extract") || lower.contains("claim") || lower.contains("done") || lower.contains("finish") {
+            6
+        } else if lower.contains("offer") || lower.contains("eligib") || lower.contains("pixel") || lower.contains("profile") {
+            5
+        } else if lower.contains("2fa") || lower.contains("totp") || lower.contains("otp") || lower.contains("verify") {
+            4
+        } else if lower.contains("pass") || lower.contains("login") {
+            3
+        } else if lower.contains("spam") || lower.contains("captcha") {
+            2
+        } else {
+            1
+        }
+    } else if mode == "payadd" {
+        if lower.contains("done") || lower.contains("finish") || lower.contains("complete") {
+            7
+        } else if lower.contains("add") || lower.contains("payadd") || lower.contains("card") || lower.contains("paysafe") {
+            6
+        } else if lower.contains("profile") || lower.contains("hstt") || lower.contains("billing") {
+            5
+        } else if lower.contains("2fa") || lower.contains("totp") || lower.contains("otp") || lower.contains("verify") {
+            4
+        } else if lower.contains("pass") || lower.contains("login") {
+            3
+        } else if lower.contains("spam") || lower.contains("captcha") {
+            2
+        } else {
+            1
+        }
     } else {
-        1
+        // autopay (10 steps matching upstream)
+        if lower.contains("done") || lower.contains("finish") || lower.contains("complete") {
+            10
+        } else if lower.contains("process") || lower.contains("checkout") || lower.contains("autopay") || lower.contains("pay") && !lower.contains("profile") && !lower.contains("add") {
+            9
+        } else if lower.contains("claim") || lower.contains("redeem") || lower.contains("accept") {
+            8
+        } else if lower.contains("offer") || lower.contains("eligib") || lower.contains("pixel") {
+            7
+        } else if lower.contains("add payment") || lower.contains("add_payment") || lower.contains("card") {
+            6
+        } else if lower.contains("profile") || lower.contains("hstt") || lower.contains("billing") {
+            5
+        } else if lower.contains("2fa") || lower.contains("totp") || lower.contains("otp") || lower.contains("verify") {
+            4
+        } else if lower.contains("pass") || lower.contains("login") {
+            3
+        } else if lower.contains("spam") || lower.contains("captcha") {
+            2
+        } else {
+            1
+        }
     }
 }
 
@@ -651,6 +720,7 @@ fn render_progress_card(
     current_step: Option<&str>,
     offer_link: Option<&str>,
     error_msg: Option<&str>,
+    raw_error_msg: Option<&str>,
     elapsed_secs: u64,
 ) -> String {
     let title = match mode {
@@ -659,30 +729,44 @@ fn render_progress_card(
         _ => "Kích hoạt Gemini Pro tự động",
     };
 
-    let steps = if mode == "payadd" {
-        [
+    let steps: &[&str] = if mode == "payadd" {
+        &[
             "1. Email",
             "2. Kiểm tra spam",
             "3. Mật khẩu",
             "4. Xác thực 2 bước",
             "5. Hồ sơ thanh toán",
-            "6. Thêm PaySafeCard",
+            "6. Thêm thanh toán",
+            "7. Hoàn tất",
         ]
-    } else {
-        [
+    } else if mode == "extract" {
+        &[
             "1. Email",
             "2. Kiểm tra spam",
             "3. Mật khẩu",
             "4. Xác thực 2 bước",
             "5. Kiểm tra ưu đãi",
-            "6. Nhận ưu đãi",
+            "6. Trích xuất link ưu đãi",
+        ]
+    } else {
+        &[
+            "1. Email",
+            "2. Kiểm tra spam",
+            "3. Mật khẩu",
+            "4. Xác thực 2 bước",
+            "5. Hồ sơ thanh toán",
+            "6. Thêm thanh toán",
+            "7. Kiểm tra ưu đãi",
+            "8. Nhận ưu đãi",
+            "9. Xử lý thanh toán",
+            "10. Hoàn tất",
         ]
     };
 
     let active_idx = match status {
-        "success" => 7,
+        "success" => steps.len() + 1,
         "queued" => 0,
-        _ => step_index_from_name(current_step).max(1),
+        _ => resolve_step_index(mode, current_step, raw_error_msg).max(1),
     };
 
     let mut step_lines = String::new();
@@ -772,8 +856,11 @@ pub fn translate_upstream_error(raw: &str) -> String {
     if lower.contains("disabled") || lower.contains("suspended") || lower.contains("locked") || lower.contains("banned") {
         return "Tài khoản Gmail đang bị Google tạm khóa hoặc vô hiệu hóa.".to_string();
     }
-    if lower.contains("captcha") || lower.contains("phone") || lower.contains("sms") || lower.contains("challenge") || lower.contains("recovery") || lower.contains("verify_device") {
-        return "Google yêu cầu xác minh bổ sung (số điện thoại / thiết bị tin cậy / captcha) nên hệ thống không thể đăng nhập tự động.".to_string();
+    if lower.contains("spam") || lower.contains("captcha") || lower.contains("recaptcha") || lower.contains("bot") {
+        return "Tài khoản yêu cầu xác thực thông tin Captcha, phát hiện dấu hiệu spam. Google yêu cầu xác minh thêm. Vui lòng đổi tài khoản Gmail khác hoặc thử lại sau.".to_string();
+    }
+    if lower.contains("phone") || lower.contains("sms") || lower.contains("challenge") || lower.contains("recovery") || lower.contains("verify_device") {
+        return "Google yêu cầu xác minh bổ sung (số điện thoại / thiết bị tin cậy) nên hệ thống không thể đăng nhập tự động.".to_string();
     }
     if lower.contains("already") || lower.contains("subscribed") || lower.contains("existing_plan") {
         return "Tài khoản Gmail này đã hoặc đang sử dụng gói Google One / Gemini Pro.".to_string();
