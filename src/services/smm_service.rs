@@ -360,11 +360,14 @@ pub fn spawn_live_job_tracker(
                 .get("current_step")
                 .and_then(|v| v.as_str())
                 .map(str::to_string);
-            let error_msg = val
+            let raw_error_msg = val
                 .get("error_msg")
                 .and_then(|v| v.as_str())
                 .filter(|s| !s.is_empty())
                 .map(str::to_string);
+            let friendly_error_msg = raw_error_msg
+                .as_deref()
+                .map(translate_upstream_error);
 
             // Extract offer/result link (primary field from api.smm.io.vn is `extract_link`)
             let offer_link = extract_link_from_response(&val);
@@ -374,7 +377,7 @@ pub fn spawn_live_job_tracker(
                 order_id,
                 &status,
                 current_step.as_deref(),
-                offer_link.as_deref().or(error_msg.as_deref()),
+                offer_link.as_deref().or(friendly_error_msg.as_deref()),
             )
             .await;
 
@@ -385,7 +388,7 @@ pub fn spawn_live_job_tracker(
                 position,
                 current_step.as_deref(),
                 offer_link.as_deref(),
-                error_msg.as_deref(),
+                friendly_error_msg.as_deref(),
                 elapsed_secs,
             );
 
@@ -454,8 +457,15 @@ pub fn spawn_live_job_tracker(
             }
 
             if status == "failed" || status == "cancelled" {
-                let reason = error_msg
-                    .unwrap_or_else(|| "Hệ thống tự động báo xử lý thất bại".to_string());
+                let reason = friendly_error_msg.unwrap_or_else(|| {
+                    "Hệ thống tự động báo xử lý thất bại. Vui lòng kiểm tra lại thông tin tài khoản."
+                        .to_string()
+                });
+                let raw_code_note = raw_error_msg
+                    .as_deref()
+                    .filter(|r| *r != reason)
+                    .map(|r| format!(" (<code>{}</code>)", escape_html(r)))
+                    .unwrap_or_default();
                 let auto_refund = settings_repo::get_settings(&state.pool)
                     .await
                     .map(|s| s.smm_auto_refund_on_fail)
@@ -504,7 +514,7 @@ pub fn spawn_live_job_tracker(
                          • Chế độ: <b>{}</b>\n\
                          • Gmail: <code>{}</code>\n\
                          • Khách (TG ID): <code>{}</code>\n\
-                         • Lý do lỗi: <i>{}</i>\n\
+                         • Lý do lỗi: <i>{}</i>{}\n\
                          • Trạng thái hoàn tiền: <b>{}</b>",
                         order_code,
                         job_id,
@@ -512,6 +522,7 @@ pub fn spawn_live_job_tracker(
                         escape_html(&gmail),
                         user_telegram_id,
                         escape_html(&reason),
+                        raw_code_note,
                         refund_status,
                     );
                     let _ = state
@@ -735,4 +746,55 @@ fn render_progress_card(
         footer,
         time_str,
     )
+}
+
+/// Translate raw upstream error codes (such as `pixel_err_2fa_not_enabled`) into clear,
+/// customer-friendly Vietnamese without exposing internal provider keywords.
+pub fn translate_upstream_error(raw: &str) -> String {
+    let trimmed = raw.trim();
+    let lower = trimmed.to_lowercase();
+
+    if lower.contains("2fa_not_enabled") || lower.contains("no_2fa") || lower.contains("2fa_disabled") {
+        return "Tài khoản chưa bật xác thực 2 yếu tố (2FA) hoặc phương thức 2FA hiện tại chưa được hỗ trợ. Vui lòng bật 2FA bằng ứng dụng Authenticator theo hướng dẫn (/guide).".to_string();
+    }
+    if lower.contains("wrong_password") || lower.contains("bad_password") || lower.contains("invalid_password") || lower.contains("incorrect_password") {
+        return "Sai mật khẩu Gmail. Vui lòng kiểm tra lại mật khẩu chính xác trước khi đặt lại.".to_string();
+    }
+    if lower.contains("totp") || lower.contains("2fa_invalid") || lower.contains("wrong_2fa") || lower.contains("invalid_otp") || lower.contains("wrong_otp") || lower.contains("2fa_failed") {
+        return "Khóa bí mật 2FA (32 ký tự) không chính xác hoặc không khớp với tài khoản Gmail.".to_string();
+    }
+    if lower.contains("backup_code") {
+        return "Mã dự phòng (Backup Codes) không hợp lệ hoặc đã được sử dụng.".to_string();
+    }
+    if lower.contains("not_found") || lower.contains("invalid_email") || lower.contains("no_account") {
+        return "Không tìm thấy tài khoản Gmail này. Vui lòng kiểm tra lại địa chỉ email.".to_string();
+    }
+    if lower.contains("disabled") || lower.contains("suspended") || lower.contains("locked") || lower.contains("banned") {
+        return "Tài khoản Gmail đang bị Google tạm khóa hoặc vô hiệu hóa.".to_string();
+    }
+    if lower.contains("captcha") || lower.contains("phone") || lower.contains("sms") || lower.contains("challenge") || lower.contains("recovery") || lower.contains("verify_device") {
+        return "Google yêu cầu xác minh bổ sung (số điện thoại / thiết bị tin cậy / captcha) nên hệ thống không thể đăng nhập tự động.".to_string();
+    }
+    if lower.contains("already") || lower.contains("subscribed") || lower.contains("existing_plan") {
+        return "Tài khoản Gmail này đã hoặc đang sử dụng gói Google One / Gemini Pro.".to_string();
+    }
+    if lower.contains("family") {
+        return "Tài khoản Gmail đang tham gia nhóm gia đình (Google Family). Vui lòng rời nhóm Family trước khi kích hoạt.".to_string();
+    }
+    if lower.contains("payment_profile") || lower.contains("hstt") || lower.contains("billing") || lower.contains("country") {
+        return "Tài khoản chưa đóng Hồ sơ thanh toán (HSTT) cũ hoặc không thuộc quốc gia hỗ trợ.".to_string();
+    }
+    if lower.contains("ineligible") || lower.contains("not_eligible") || lower.contains("no_offer") || lower.contains("offer_unavailable") {
+        return "Tài khoản Gmail không đủ điều kiện nhận ưu đãi. Vui lòng kiểm tra lại Hồ sơ thanh toán (HSTT) hoặc thử tài khoản Gmail trắng khác.".to_string();
+    }
+    if lower.contains("timeout") || lower.contains("timed_out") {
+        return "Quá thời gian phản hồi từ hệ thống Google. Vui lòng thử đặt lại đơn sau ít phút.".to_string();
+    }
+
+    // Never expose raw `pixel_err_*` or `pixel` keywords to customers
+    if lower.starts_with("pixel_err_") || lower.contains("pixel_err") || lower.contains("pixel") {
+        return "Tài khoản không đủ điều kiện hoặc không thể đăng nhập tự động. Vui lòng kiểm tra lại mật khẩu, 2FA và đóng Hồ sơ thanh toán theo hướng dẫn (/guide).".to_string();
+    }
+
+    trimmed.to_string()
 }

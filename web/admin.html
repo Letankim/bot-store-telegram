@@ -971,6 +971,31 @@
     </div>
   </div>
 
+  <!-- REFUND ORDER MODAL (AUTO-PREFILLED WITH UPSTREAM API ERROR) -->
+  <div id="refundModal" class="modal-backdrop" onclick="if(event.target===this) closeRefundModal()">
+    <div class="modal-box" style="max-width:520px;">
+      <div class="card-head" style="margin-bottom:12px;">
+        <div class="card-title"><i class="bx bx-undo" style="color:#f87171;"></i> <span>Hoàn tiền 100% đơn hàng lỗi</span></div>
+        <button class="btn btn-ghost" onclick="closeRefundModal()"><i class="bx bx-x"></i></button>
+      </div>
+      <div style="font-size:0.84rem;color:var(--muted);margin-bottom:12px;line-height:1.6;">
+        Mã đơn: <strong id="refOrderCode" style="color:var(--text);">--</strong> • Số tiền hoàn: <strong id="refOrderAmt" style="color:#34d399;">--</strong><br/>
+        Gói: <strong id="refOrderPlan" style="color:var(--text);">--</strong>
+      </div>
+      <div id="refApiHint" style="display:none;margin-bottom:12px;padding:9px 11px;border-radius:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;font-size:0.8rem;line-height:1.45;word-break:break-word;"></div>
+      <div class="form-group" style="margin-bottom:16px;">
+        <label>Lý do hoàn tiền gửi cho khách &amp; Admin (đã tự điền theo lỗi API — có thể chỉnh sửa)</label>
+        <textarea id="refundReasonInput" rows="4" placeholder="Nhập lý do hoàn tiền gửi cho khách..."></textarea>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeRefundModal()">Hủy</button>
+        <button id="refConfirmBtn" class="btn btn-danger" onclick="submitRefundOrder()">
+          <i class="bx bx-undo"></i> Xác nhận hoàn tiền &amp; gửi khách
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- WALLET LEDGER MODAL -->
   <div id="txModal" class="modal-backdrop" onclick="if(event.target===this) closeTxModal()">
     <div class="modal-box">
@@ -992,6 +1017,53 @@
     const usersById = {};
     const ordersById = {};
     let pendingAdjust = { userId: null, sign: 1 };
+    let pendingRefundOrderId = null;
+
+    function translateApiErrorClient(raw) {
+      const s = String(raw || "").trim();
+      if (!s) return "";
+      const l = s.toLowerCase();
+      if (l.includes("2fa_not_enabled") || l.includes("no_2fa") || l.includes("2fa_disabled")) {
+        return "Tài khoản chưa bật xác thực 2 yếu tố (2FA) hoặc phương thức 2FA hiện tại chưa được hỗ trợ. Vui lòng bật 2FA bằng ứng dụng Authenticator theo hướng dẫn (/guide).";
+      }
+      if (l.includes("wrong_password") || l.includes("bad_password") || l.includes("invalid_password") || l.includes("incorrect_password")) {
+        return "Sai mật khẩu Gmail. Vui lòng kiểm tra lại mật khẩu chính xác trước khi đặt lại.";
+      }
+      if (l.includes("totp") || l.includes("2fa_invalid") || l.includes("wrong_2fa") || l.includes("invalid_otp") || l.includes("wrong_otp") || l.includes("2fa_failed")) {
+        return "Khóa bí mật 2FA (32 ký tự) không chính xác hoặc không khớp với tài khoản Gmail.";
+      }
+      if (l.includes("backup_code")) {
+        return "Mã dự phòng (Backup Codes) không hợp lệ hoặc đã được sử dụng.";
+      }
+      if (l.includes("not_found") || l.includes("invalid_email") || l.includes("no_account")) {
+        return "Không tìm thấy tài khoản Gmail này. Vui lòng kiểm tra lại địa chỉ email.";
+      }
+      if (l.includes("disabled") || l.includes("suspended") || l.includes("locked") || l.includes("banned")) {
+        return "Tài khoản Gmail đang bị Google tạm khóa hoặc vô hiệu hóa.";
+      }
+      if (l.includes("captcha") || l.includes("phone") || l.includes("sms") || l.includes("challenge") || l.includes("recovery")) {
+        return "Google yêu cầu xác minh bổ sung (số điện thoại / thiết bị tin cậy / captcha) nên hệ thống không thể đăng nhập tự động.";
+      }
+      if (l.includes("already") || l.includes("subscribed") || l.includes("existing_plan")) {
+        return "Tài khoản Gmail này đã hoặc đang sử dụng gói Google One / Gemini Pro.";
+      }
+      if (l.includes("family")) {
+        return "Tài khoản Gmail đang tham gia nhóm gia đình (Google Family). Vui lòng rời nhóm Family trước khi kích hoạt.";
+      }
+      if (l.includes("payment_profile") || l.includes("hstt") || l.includes("billing") || l.includes("country")) {
+        return "Tài khoản chưa đóng Hồ sơ thanh toán (HSTT) cũ hoặc không thuộc quốc gia hỗ trợ.";
+      }
+      if (l.includes("ineligible") || l.includes("not_eligible") || l.includes("no_offer") || l.includes("offer_unavailable")) {
+        return "Tài khoản Gmail không đủ điều kiện nhận ưu đãi. Vui lòng kiểm tra lại Hồ sơ thanh toán (HSTT) hoặc thử tài khoản Gmail trắng khác.";
+      }
+      if (l.includes("timeout") || l.includes("timed_out")) {
+        return "Quá thời gian phản hồi từ hệ thống Google. Vui lòng thử đặt lại đơn sau ít phút.";
+      }
+      if (l.startsWith("pixel_err_") || l.includes("pixel_err") || l.includes("pixel")) {
+        return "Tài khoản không đủ điều kiện hoặc không thể đăng nhập tự động. Vui lòng kiểm tra lại mật khẩu, 2FA và đóng Hồ sơ thanh toán theo hướng dẫn (/guide).";
+      }
+      return s;
+    }
 
     function updatePendingIndicators(count) {
       const n = Number(count || 0);
@@ -1443,13 +1515,19 @@
       if (batchBar) batchBar.style.display = hasPending ? "flex" : "none";
       json.data.forEach(o => { ordersById[o.id] = o; });
 
-      listEl.innerHTML = json.data.map(o => `
+      listEl.innerHTML = json.data.map(o => {
+        const isApiFailed = o.external_status === "failed" || o.external_status === "cancelled";
+        const apiErrText = (o.external_result && !o.external_result.startsWith("http"))
+          ? translateApiErrorClient(o.external_result)
+          : "";
+        return `
         <div class="item-row">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
               ${o.status === "PENDING" ? `<input type="checkbox" class="order-chk" value="${o.id}" onchange="updateSelectedCount()" style="width:18px;height:18px;accent-color:#3b82f6;cursor:pointer;" />` : ''}
               <strong>#${o.order_code}</strong>
               <span class="badge ${o.status === 'COMPLETED' ? 'badge-ok' : o.status === 'REFUNDED' ? 'badge-err' : 'badge-warn'}">${o.status}</span>
+              ${isApiFailed && o.status === 'PROCESSING' ? '<span class="badge badge-err">API báo lỗi — chờ hoàn tiền</span>' : ''}
               <span class="badge" style="background:rgba(59,130,246,0.18);color:#93c5fd;">${formatApiModeLabel(o.plan_api_mode)}</span>
             </div>
             <div style="font-weight:700;color:#34d399;">${fmtVnd(o.price_paid_vnd)}</div>
@@ -1459,8 +1537,9 @@
             <span>${escapeAttr(o.credentials_formatted)}</span>
             <button class="btn btn-ghost" onclick="copyOrderCreds('${o.id}')"><i class="bx bx-copy"></i> Copy</button>
           </div>
-          ${o.external_job_id ? `<div style="font-size:0.8rem;color:#93c5fd;margin-bottom:6px;">API Job #${o.external_job_id} • Trạng thái: <strong>${o.external_status || 'running'}</strong> ${o.external_step ? '(' + o.external_step + ')' : ''}</div>` : ''}
+          ${o.external_job_id ? `<div style="font-size:0.8rem;color:${isApiFailed ? '#fca5a5' : '#93c5fd'};margin-bottom:6px;">API Job #${o.external_job_id} • Trạng thái: <strong>${escapeAttr(o.external_status || 'running')}</strong> ${o.external_step ? '(' + escapeAttr(o.external_step) + ')' : ''}</div>` : ''}
           ${o.external_result && o.external_result.startsWith("http") ? `<div class="code-line" style="border-color:rgba(16,185,129,0.5);color:#34d399;"><span>🔗 ${escapeAttr(o.external_result)}</span><button class="btn btn-ghost" onclick="copyOrderLink('${o.id}')"><i class="bx bx-copy"></i> Copy link</button></div>` : ''}
+          ${apiErrText ? `<div style="margin:8px 0;padding:9px 12px;border-radius:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;font-size:0.82rem;line-height:1.5;word-break:break-word;"><i class="bx bx-error-circle"></i> <strong>Lý do lỗi từ API:</strong> ${escapeAttr(apiErrText)}</div>` : ''}
           ${o.status === "PENDING" || o.status === "PROCESSING" ? `
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
               ${o.status === "PENDING" ? `<button class="btn btn-primary" onclick="pushOrderApi('${o.id}')"><i class="bx bx-rocket"></i> Đẩy qua API (${o.plan_api_mode})</button>` : ''}
@@ -1468,13 +1547,14 @@
               <button class="btn btn-danger" onclick="refundOrder('${o.id}')"><i class="bx bx-undo"></i> Hoàn tiền 100% đơn lỗi</button>
             </div>
           ` : `
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-top:8px;">
-              <div style="font-size:0.8rem;color:var(--muted);">Ghi chú: ${o.admin_note || "Không có"}</div>
-              ${o.external_job_id ? `<button class="btn btn-primary" onclick="syncOrderLink('${o.id}')"><i class="bx bx-sync"></i> Lấy lại &amp; gửi bù link</button>` : ''}
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;margin-top:8px;">
+              <div style="flex:1 1 260px;min-width:0;font-size:0.82rem;color:var(--muted);line-height:1.5;word-break:break-word;">Ghi chú: <span style="color:var(--text);">${escapeAttr(o.admin_note || "Không có")}</span></div>
+              ${o.external_job_id && o.status === "COMPLETED" ? `<button class="btn btn-primary" style="flex-shrink:0;" onclick="syncOrderLink('${o.id}')"><i class="bx bx-sync"></i> Lấy lại &amp; gửi bù link</button>` : ''}
             </div>
           `}
         </div>
-      `).join("");
+      `;
+      }).join("");
       updateSelectedCount();
     }
 
@@ -1517,15 +1597,50 @@
       loadOrders();
     }
 
-    async function refundOrder(id) {
-      const reason = prompt("Nhập lý do hoàn tiền cho khách:", "Gmail chưa đóng Hồ sơ thanh toán (HSTT) hoặc sai mật khẩu");
-      if (!reason) return;
-      const json = await apiFetch(`/api/v1/admin/orders/${id}/refund`, {
+    function refundOrder(id) {
+      const o = ordersById[id];
+      if (!o) return;
+      pendingRefundOrderId = id;
+      document.getElementById("refOrderCode").textContent = "#" + o.order_code;
+      document.getElementById("refOrderAmt").textContent = fmtVnd(o.price_paid_vnd);
+      document.getElementById("refOrderPlan").textContent = o.plan_name || "Gemini Pro";
+
+      const hasApiErr = o.external_result && !o.external_result.startsWith("http");
+      const translatedErr = hasApiErr ? translateApiErrorClient(o.external_result) : "";
+      const hintEl = document.getElementById("refApiHint");
+      if (hasApiErr) {
+        hintEl.style.display = "block";
+        hintEl.innerHTML = `<i class="bx bx-info-circle"></i> <strong>Phản hồi lỗi từ API:</strong> ${escapeAttr(o.external_result)}`;
+      } else {
+        hintEl.style.display = "none";
+      }
+
+      document.getElementById("refundReasonInput").value =
+        translatedErr || "Gmail chưa đóng Hồ sơ thanh toán (HSTT) hoặc sai mật khẩu";
+      document.getElementById("refundModal").classList.add("open");
+    }
+
+    function closeRefundModal() {
+      document.getElementById("refundModal").classList.remove("open");
+      pendingRefundOrderId = null;
+    }
+
+    async function submitRefundOrder() {
+      if (!pendingRefundOrderId) return;
+      const reason = document.getElementById("refundReasonInput").value.trim();
+      if (!reason) return showToast("Vui lòng nhập lý do hoàn tiền!");
+      const btn = document.getElementById("refConfirmBtn");
+      btn.disabled = true;
+      const json = await apiFetch(`/api/v1/admin/orders/${pendingRefundOrderId}/refund`, {
         method: "POST",
         body: JSON.stringify({ reason })
       });
+      btn.disabled = false;
       showToast(json.message);
-      loadOrders();
+      if (json.success) {
+        closeRefundModal();
+        loadOrders();
+      }
     }
 
     function escapeAttr(str) {
