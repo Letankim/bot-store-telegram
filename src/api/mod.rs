@@ -33,6 +33,12 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/users/{user_id}/wallet/adjust", post(admin::adjust_user_wallet))
         .route("/users/{user_id}/ban", post(admin::toggle_user_ban))
         .route("/users/{user_id}/transactions", get(admin::list_user_transactions))
+        .route("/partner-shop/settings", put(admin::update_partner_shop_settings))
+        .route("/partner-shop/balance", get(admin::get_partner_shop_balance))
+        .route("/partner-shop/sync", post(admin::sync_partner_shop_now))
+        .route("/partner-shop/products", get(admin::list_partner_shop_products))
+        .route("/partner-shop/products/{product_id}", put(admin::update_partner_shop_product))
+        .route("/partner-shop/orders", get(admin::list_partner_shop_orders))
         .route_layer(axum_mw::from_fn_with_state(
             state.clone(),
             middleware::require_admin_api_key,
@@ -41,6 +47,7 @@ pub fn build_router(state: SharedState) -> Router {
     let web_auth_routes = Router::new()
         .route("/me", get(web_store::web_me))
         .route("/orders", get(web_store::web_list_orders).post(web_store::web_create_order))
+        .route("/partner-orders", get(web_store::web_list_partner_orders).post(web_store::web_buy_partner_product))
         .route("/deposits", post(web_store::web_create_deposit))
         .route("/deposits/{order_code}/check", post(web_store::web_check_deposit))
         .route("/deposits/{order_code}/cancel", post(web_store::web_cancel_deposit))

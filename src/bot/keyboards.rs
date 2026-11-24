@@ -3,9 +3,12 @@ use teloxide::types::{
 };
 use url::Url;
 
-use crate::domain::{gemini_plan::GeminiPlan, wallet::format_vnd};
+use crate::domain::{
+    gemini_plan::GeminiPlan, partner_shop::PartnerProduct, wallet::format_vnd,
+};
 
 pub const BTN_GEMINI_PRO: &str = "🤖 Kích hoạt Gemini Pro";
+pub const BTN_PARTNER_SHOP: &str = "🛍️ Cửa hàng tài khoản & Key";
 pub const BTN_WALLET: &str = "💰 Ví & nạp tiền";
 pub const BTN_ORDERS: &str = "📦 Đơn hàng của tôi";
 pub const BTN_GUIDE: &str = "📘 Hướng dẫn 2FA & HSTT";
@@ -16,13 +19,16 @@ pub fn main_reply_keyboard() -> KeyboardMarkup {
     KeyboardMarkup::new(vec![
         vec![
             KeyboardButton::new(BTN_GEMINI_PRO),
-            KeyboardButton::new(BTN_ORDERS),
+            KeyboardButton::new(BTN_PARTNER_SHOP),
         ],
         vec![
+            KeyboardButton::new(BTN_ORDERS),
             KeyboardButton::new(BTN_WALLET),
-            KeyboardButton::new(BTN_GUIDE),
         ],
-        vec![KeyboardButton::new(BTN_REFERRAL)],
+        vec![
+            KeyboardButton::new(BTN_GUIDE),
+            KeyboardButton::new(BTN_REFERRAL),
+        ],
     ])
     .resize_keyboard()
     .persistent()
@@ -189,4 +195,78 @@ pub fn maintenance_broadcast_keyboard() -> InlineKeyboardMarkup {
         InlineKeyboardButton::callback("📋 Xem sản phẩm khác", "back:plans"),
         InlineKeyboardButton::callback("⬅️ Menu chính", "back:home"),
     ]])
+}
+
+/// Inline keyboard listing synced Partner Shop products (accounts & keys).
+pub fn partner_shop_list_keyboard(products: &[PartnerProduct]) -> InlineKeyboardMarkup {
+    let mut rows: Vec<Vec<InlineKeyboardButton>> = products
+        .iter()
+        .map(|p| {
+            let icon = if p.is_maintenance {
+                "🔧"
+            } else if !p.emoji.is_empty() {
+                p.emoji.as_str()
+            } else {
+                "🛍️"
+            };
+            let status_tag = if p.is_maintenance {
+                " (Bảo trì)".to_string()
+            } else if p.stock <= 0 {
+                " (Hết hàng)".to_string()
+            } else {
+                format!(" [Còn {}]", p.stock)
+            };
+            vec![InlineKeyboardButton::callback(
+                format!("{icon} {} — {}đ{status_tag}", p.name, format_vnd(p.sell_price_vnd)),
+                format!("pprod:{}", p.id),
+            )]
+        })
+        .collect();
+    rows.push(vec![InlineKeyboardButton::callback(
+        "⬅️ Quay lại menu chính",
+        "back:home",
+    )]);
+    InlineKeyboardMarkup::new(rows)
+}
+
+/// Inline keyboard with instant-buy quantity buttons under a Partner Shop product card.
+pub fn partner_product_detail_keyboard(product: &PartnerProduct) -> InlineKeyboardMarkup {
+    let mut rows = Vec::new();
+    let pid = product.id;
+
+    let mut buy_row1 = vec![InlineKeyboardButton::callback(
+        format!("🛒 Mua 1 ({}đ)", format_vnd(product.sell_price_vnd)),
+        format!("pbuy:{pid}:1"),
+    )];
+    if product.stock >= 2 {
+        buy_row1.push(InlineKeyboardButton::callback(
+            format!("🛒 Mua 2 ({}đ)", format_vnd(product.sell_price_vnd * 2)),
+            format!("pbuy:{pid}:2"),
+        ));
+    }
+    rows.push(buy_row1);
+
+    let mut buy_row2 = Vec::new();
+    if product.stock >= 3 {
+        buy_row2.push(InlineKeyboardButton::callback(
+            format!("🛒 Mua 3 ({}đ)", format_vnd(product.sell_price_vnd * 3)),
+            format!("pbuy:{pid}:3"),
+        ));
+    }
+    if product.stock >= 5 {
+        buy_row2.push(InlineKeyboardButton::callback(
+            format!("🛒 Mua 5 ({}đ)", format_vnd(product.sell_price_vnd * 5)),
+            format!("pbuy:{pid}:5"),
+        ));
+    }
+    if !buy_row2.is_empty() {
+        rows.push(buy_row2);
+    }
+
+    rows.push(vec![
+        InlineKeyboardButton::callback("⏪ Sản phẩm khác", "pshop:list"),
+        InlineKeyboardButton::callback("⬅️ Menu chính", "back:home"),
+    ]);
+
+    InlineKeyboardMarkup::new(rows)
 }

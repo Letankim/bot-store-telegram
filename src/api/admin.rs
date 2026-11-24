@@ -19,17 +19,22 @@ use crate::{
     crypto::{compute_admin_session_token, constant_time_eq_str},
     domain::{
         gemini_plan::GeminiPlan,
+        partner_shop::{PartnerOrder, PartnerProduct},
         settings::AppSettings,
         wallet::{WalletTransaction, format_vnd},
     },
     error::AppError,
     repo::{
-        activation_repo, plan_repo, settings_repo,
+        activation_repo, partner_repo, plan_repo, settings_repo,
         user_repo::{self, AdminUserWithWallet, AdminUsersSummary},
         wallet_repo,
     },
     response::{ApiResponse, PaginationMeta},
-    services::{activation_service::AdminOrderView, smm_service},
+    services::{
+        activation_service::AdminOrderView,
+        partner_shop_service::{self, PartnerBalanceInfo, PartnerSyncSummary},
+        smm_service,
+    },
     state::SharedState,
 };
 
@@ -1357,5 +1362,168 @@ pub async fn list_user_transactions(
         txs,
         "Lấy lịch sử giao dịch ví thành công",
         ctx.request_id,
+    ))
+}
+
+// =============================================================================
+// Partner Shop API Management Endpoints (`/api/v1/admin/partner-shop/*`)
+// =============================================================================
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePartnerShopSettingsReq {
+    pub partner_shop_base_url: String,
+    pub partner_shop_api_key: Option<String>,
+    pub partner_shop_enabled: bool,
+    pub partner_shop_markup_vnd: i64,
+    pub partner_shop_sync_interval_secs: i32,
+    pub partner_shop_notify_changes: bool,
+}
+
+/// Update Partner Shop API credentials, profit markup (default +30,000 VND) & sync settings.
+pub async fn update_partner_shop_settings(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Json(payload): Json<UpdatePartnerShopSettingsReq>,
+) -> Result<ApiResponse<AppSettings>, AppError> {
+    let updated = settings_repo::update_partner_shop_settings(
+        &state.pool,
+        &payload.partner_shop_base_url,
+        payload.partner_shop_api_key.as_deref(),
+        payload.partner_shop_enabled,
+        payload.partner_shop_markup_vnd,
+        payload.partner_shop_sync_interval_secs,
+        payload.partner_shop_notify_changes,
+    )
+    .await?;
+
+    Ok(ApiResponse::ok(
+        updated,
+        "Đã lưu cấu hình Shop đối tác & cập nhật giá bán theo mức lời mới!",
+        ctx.request_id,
+    ))
+}
+
+/// Check live Partner Shop wallet balance (`GET /api/partner-api/balance`).
+pub async fn get_partner_shop_balance(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+) -> Result<ApiResponse<PartnerBalanceInfo>, AppError> {
+    let settings = settings_repo::get_settings(&state.pool).await?;
+    let info = partner_shop_service::fetch_partner_balance(
+        &settings.partner_shop_base_url,
+        &settings.partner_shop_api_key,
+    )
+    .await?;
+
+    Ok(ApiResponse::ok(
+        info,
+        "Kiểm tra số dư Shop đối tác thành công",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TriggerPartnerSyncReq {
+    pub notify_changes: Option<bool>,
+}
+
+/// Trigger an immediate sync of all products, prices & stock from Partner Shop API.
+pub async fn sync_partner_shop_now(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Json(payload): Json<TriggerPartnerSyncReq>,
+) -> Result<ApiResponse<PartnerSyncSummary>, AppError> {
+    let notify = payload.notify_changes.unwrap_or(true);
+    let summary = partner_shop_service::sync_partner_products(&state, notify).await?;
+    let msg = format!(
+        "Đồng bộ xong {} sản phẩm (mới: {}, đổi giá: {}, lên kho: {}).",
+        summary.total_synced,
+        summary.new_count,
+        summary.price_changed_count,
+        summary.restocked_count
+    );
+    Ok(ApiResponse::ok(summary, msg, ctx.request_id))
+}
+
+/// List all synced Partner Shop products with cost price, profit markup & sell price for Admin.
+pub async fn list_partner_shop_products(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+) -> Result<ApiResponse<Vec<PartnerProduct>>, AppError> {
+    let items = partner_repo::list_all_products(&state.pool).await?;
+    Ok(ApiResponse::ok(
+        items,
+        "Lấy danh sách sản phẩm Shop đối tác thành công",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdatePartnerProductReq {
+    /// When `Some(Some(val))` -> set custom markup; `Some(None)` -> reset to global default markup; `None` -> unchanged.
+    #[serde(default)]
+    pub set_custom_markup: bool,
+    pub custom_markup_vnd: Option<i64>,
+    pub is_active: Option<bool>,
+    pub is_maintenance: Option<bool>,
+    pub maintenance_note: Option<String>,
+}
+
+/// Update custom profit markup, visibility, or maintenance status of a synced partner product.
+pub async fn update_partner_shop_product(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Path(product_id): Path<Uuid>,
+    Json(payload): Json<UpdatePartnerProductReq>,
+) -> Result<ApiResponse<PartnerProduct>, AppError> {
+    let settings = settings_repo::get_settings(&state.pool).await?;
+    let updated = partner_repo::update_product_admin(
+        &state.pool,
+        product_id,
+        settings.partner_shop_markup_vnd,
+        payload.set_custom_markup,
+        payload.custom_markup_vnd,
+        payload.is_active,
+        payload.is_maintenance,
+        payload.maintenance_note.as_deref(),
+    )
+    .await?;
+
+    Ok(ApiResponse::ok(
+        updated,
+        "Cập nhật sản phẩm Shop đối tác thành công",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ListPartnerOrdersQuery {
+    pub page: Option<u32>,
+    pub per_page: Option<u32>,
+}
+
+/// List Partner Shop purchase orders with revenue, partner cost & net profit.
+pub async fn list_partner_shop_orders(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Query(q): Query<ListPartnerOrdersQuery>,
+) -> Result<ApiResponse<Vec<PartnerOrder>>, AppError> {
+    let page = q.page.unwrap_or(1).max(1);
+    let per_page = q.per_page.unwrap_or(20).clamp(1, 100);
+    let offset = i64::from((page - 1) * per_page);
+    let (orders, total) =
+        partner_repo::list_orders_for_admin(&state.pool, i64::from(per_page), offset).await?;
+    let total_pages = ((total as f64) / (per_page as f64)).ceil() as u32;
+
+    Ok(ApiResponse::ok_paginated(
+        orders,
+        "Lấy danh sách đơn Shop đối tác thành công",
+        ctx.request_id,
+        PaginationMeta {
+            page,
+            per_page,
+            total_items: total.max(0) as u64,
+            total_pages,
+        },
     ))
 }

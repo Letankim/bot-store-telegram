@@ -16,6 +16,12 @@ pub struct AppSettings {
     pub smm_auto_push: bool,
     pub smm_default_mode: String,
     pub smm_auto_refund_on_fail: bool,
+    pub partner_shop_base_url: String,
+    pub partner_shop_api_key: String,
+    pub partner_shop_enabled: bool,
+    pub partner_shop_markup_vnd: i64,
+    pub partner_shop_sync_interval_secs: i32,
+    pub partner_shop_notify_changes: bool,
     pub updated_at: DateTime<Utc>,
 }
 

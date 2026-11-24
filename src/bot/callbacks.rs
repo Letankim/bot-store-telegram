@@ -3,12 +3,14 @@ use uuid::Uuid;
 
 use crate::{
     bot::{
-        commands::{handle_show_plans, send_home_menu, send_vietqr_deposit_photo},
+        commands::{
+            handle_show_partner_shop, handle_show_plans, send_home_menu, send_vietqr_deposit_photo,
+        },
         keyboards, messages,
     },
     domain::wallet::format_vnd,
-    repo::{plan_repo, settings_repo, user_repo, wallet_repo},
-    services::payos_service::CheckPaymentStatus,
+    repo::{partner_repo, plan_repo, settings_repo, user_repo, wallet_repo},
+    services::{partner_shop_service, payos_service::CheckPaymentStatus},
     state::SharedState,
 };
 
@@ -37,6 +39,157 @@ pub async fn handle_callback(
     if data == "back:plans" {
         state.awaiting_deposit_amount.write().await.remove(&telegram_id);
         handle_show_plans(&bot, chat_id, &state).await?;
+        return Ok(());
+    }
+
+    if data == "pshop:list" {
+        state.awaiting_deposit_amount.write().await.remove(&telegram_id);
+        handle_show_partner_shop(&bot, chat_id, &state).await?;
+        return Ok(());
+    }
+
+    if let Some(pid_str) = data.strip_prefix("pprod:") {
+        if let Ok(product_id) = Uuid::parse_str(pid_str) {
+            if let Ok(Some(product)) = partner_repo::find_product_by_id(&state.pool, product_id).await {
+                let support_handle = settings_repo::get_settings(&state.pool)
+                    .await
+                    .map(|s| s.support_handle)
+                    .unwrap_or_else(|_| state.config.support_handle.clone());
+                let card = messages::partner_product_card(&product, &support_handle);
+                bot.send_message(chat_id, card)
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(keyboards::partner_product_detail_keyboard(&product))
+                    .await?;
+            } else {
+                bot.send_message(chat_id, "⚠️ Sản phẩm này không còn tồn tại.")
+                    .reply_markup(keyboards::back_to_home_keyboard())
+                    .await?;
+            }
+        }
+        return Ok(());
+    }
+
+    if let Some(rest) = data.strip_prefix("pbuy:") {
+        let mut parts = rest.split(':');
+        let (Some(pid_str), Some(qty_str)) = (parts.next(), parts.next()) else {
+            return Ok(());
+        };
+        let (Ok(product_id), Ok(qty)) = (Uuid::parse_str(pid_str), qty_str.parse::<i32>()) else {
+            return Ok(());
+        };
+        let Ok(Some(product)) = partner_repo::find_product_by_id(&state.pool, product_id).await else {
+            bot.send_message(chat_id, "⚠️ Sản phẩm không còn tồn tại.")
+                .reply_markup(keyboards::back_to_home_keyboard())
+                .await?;
+            return Ok(());
+        };
+
+        if product.is_maintenance {
+            let text = messages::partner_product_maintenance_message(&product);
+            bot.send_message(chat_id, text)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(keyboards::back_to_home_keyboard())
+                .await?;
+            return Ok(());
+        }
+
+        if product.stock < qty {
+            bot.send_message(
+                chat_id,
+                format!(
+                    "❌ Sản phẩm này hiện chỉ còn <b>{}</b> trong kho, không đủ số lượng {} bạn chọn.",
+                    product.stock, qty
+                ),
+            )
+            .parse_mode(ParseMode::Html)
+            .reply_markup(keyboards::back_to_home_keyboard())
+            .await?;
+            return Ok(());
+        }
+
+        let Ok(Some(user)) = user_repo::find_by_telegram_id(&state.pool, telegram_id).await else {
+            bot.send_message(chat_id, "⚠️ Vui lòng bấm /start trước để khởi tạo ví.")
+                .await?;
+            return Ok(());
+        };
+
+        let total_price = product.sell_price_vnd.saturating_mul(i64::from(qty));
+        let balance = wallet_repo::get_by_user_id(&state.pool, user.id)
+            .await
+            .map(|w| w.balance_vnd)
+            .unwrap_or(0);
+
+        if balance < total_price {
+            let missing = total_price - balance;
+            let settings = settings_repo::get_settings(&state.pool).await.ok();
+            let min_deposit = settings.as_ref().map(|s| s.min_deposit_vnd).unwrap_or(10_000);
+            let quick_amounts = settings
+                .as_ref()
+                .map(|s| s.parsed_quick_amounts())
+                .unwrap_or_else(|| vec![40_000, 80_000, 150_000, 300_000]);
+            let text = format!(
+                "⚠️ <b>Số dư ví chưa đủ để mua hàng!</b>\n\n\
+                 • Sản phẩm: <b>{}</b> x{qty}\n\
+                 • Tổng tiền: <b>{} đ</b>\n\
+                 • Số dư hiện có: <b>{} đ</b>\n\
+                 • Còn thiếu: <b>{} đ</b>\n\n\
+                 👇 Bấm nút bên dưới để tạo mã QR chuyển khoản (VietQR):",
+                messages::escape_html(&product.name),
+                format_vnd(total_price),
+                format_vnd(balance),
+                format_vnd(missing),
+            );
+            bot.send_message(chat_id, text)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(keyboards::payos_amount_keyboard(
+                    Some(missing),
+                    min_deposit,
+                    &quick_amounts,
+                ))
+                .await?;
+            return Ok(());
+        }
+
+        let _ = bot
+            .send_message(chat_id, "⏳ Đang xuất kho giao hàng tự động, vui lòng đợi vài giây...")
+            .await;
+
+        match partner_shop_service::purchase_partner_product(&state, user, product_id, qty).await {
+            Ok(outcome) => {
+                let items_block = outcome
+                    .items
+                    .iter()
+                    .enumerate()
+                    .map(|(i, item)| format!("{}. <code>{}</code>", i + 1, messages::escape_html(item)))
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let text = format!(
+                    "🎉 <b>MUA HÀNG THÀNH CÔNG!</b>\n\n\
+                     • Mã đơn: <code>{}</code>\n\
+                     • Sản phẩm: <b>{}</b> x{}\n\
+                     • Đã thanh toán: <b>{} đ</b>\n\
+                     • Số dư còn lại: <b>{} đ</b>\n\n\
+                     🔑 <b>Thông tin sản phẩm (chạm để copy):</b>\n\
+                     {}\n\n\
+                     ✅ Cảm ơn bạn đã ủng hộ!",
+                    outcome.order.order_code,
+                    messages::escape_html(&outcome.order.product_name),
+                    outcome.order.quantity,
+                    format_vnd(outcome.order.total_sell_price_vnd),
+                    format_vnd(outcome.remaining_balance_vnd),
+                    items_block,
+                );
+                bot.send_message(chat_id, text)
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(keyboards::back_to_home_keyboard())
+                    .await?;
+            }
+            Err(err) => {
+                bot.send_message(chat_id, format!("❌ {err}"))
+                    .reply_markup(keyboards::back_to_home_keyboard())
+                    .await?;
+            }
+        }
         return Ok(());
     }
 

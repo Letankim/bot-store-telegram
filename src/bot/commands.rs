@@ -8,8 +8,8 @@ use url::Url;
 use crate::{
     bot::{keyboards, messages},
     domain::wallet::format_vnd,
-    repo::{activation_repo, plan_repo, settings_repo, user_repo, wallet_repo},
-    services::referral_service,
+    repo::{activation_repo, partner_repo, plan_repo, settings_repo, user_repo, wallet_repo},
+    services::{partner_shop_service, referral_service},
     state::SharedState,
 };
 
@@ -20,6 +20,8 @@ pub enum Command {
     Start(String),
     #[command(description = "🤖 Kích hoạt Gemini Pro chính chủ")]
     Pixel,
+    #[command(description = "🛍️ Cửa hàng tài khoản & Key giao tự động")]
+    Shop,
     #[command(description = "💳 Nạp tiền tự động qua ngân hàng (VietQR)")]
     Payadd,
     #[command(description = "🎁 Mời bạn bè & xem thống kê tiền thưởng")]
@@ -44,6 +46,9 @@ pub async fn handle_message(bot: Bot, msg: Message, state: SharedState) -> Respo
             Command::Pixel => {
                 handle_show_plans(&bot, msg.chat.id, &state).await?;
             }
+            Command::Shop => {
+                handle_show_partner_shop(&bot, msg.chat.id, &state).await?;
+            }
             Command::Payadd => {
                 handle_payadd(&bot, msg.chat.id, telegram_id, &state).await?;
             }
@@ -62,6 +67,11 @@ pub async fn handle_message(bot: Bot, msg: Message, state: SharedState) -> Respo
         keyboards::BTN_GEMINI_PRO => {
             state.awaiting_deposit_amount.write().await.remove(&telegram_id);
             handle_show_plans(&bot, msg.chat.id, &state).await?;
+            return Ok(());
+        }
+        keyboards::BTN_PARTNER_SHOP => {
+            state.awaiting_deposit_amount.write().await.remove(&telegram_id);
+            handle_show_partner_shop(&bot, msg.chat.id, &state).await?;
             return Ok(());
         }
         keyboards::BTN_WALLET => {
@@ -401,6 +411,43 @@ pub async fn handle_show_plans(
     Ok(())
 }
 
+pub async fn handle_show_partner_shop(
+    bot: &Bot,
+    chat_id: ChatId,
+    state: &SharedState,
+) -> ResponseResult<()> {
+    let products = match partner_repo::list_active_products(&state.pool).await {
+        Ok(p) => p,
+        Err(err) => {
+            tracing::error!(error = ?err, "Failed to list partner shop products");
+            bot.send_message(chat_id, "⚠️ Không thể tải danh sách sản phẩm lúc này.")
+                .await?;
+            return Ok(());
+        }
+    };
+
+    if products.is_empty() {
+        bot.send_message(
+            chat_id,
+            "🛍️ Hiện cửa hàng tài khoản & Key đang cập nhật kho hàng mới. Vui lòng quay lại sau nhé!",
+        )
+        .reply_markup(keyboards::back_to_home_keyboard())
+        .await?;
+        return Ok(());
+    }
+
+    bot.send_message(
+        chat_id,
+        "🛍️ <b>CỬA HÀNG TÀI KHOẢN &amp; KEY GIAO TỰ ĐỘNG 24/7</b>\n\
+         👇 Chọn sản phẩm bên dưới để xem chi tiết và mua ngay:",
+    )
+    .parse_mode(ParseMode::Html)
+    .reply_markup(keyboards::partner_shop_list_keyboard(&products))
+    .await?;
+
+    Ok(())
+}
+
 pub async fn handle_payadd(
     bot: &Bot,
     chat_id: ChatId,
@@ -455,39 +502,75 @@ async fn handle_my_orders(
     let orders = activation_repo::list_by_user(&state.pool, user.id, 10)
         .await
         .unwrap_or_default();
+    let partner_orders = partner_repo::list_orders_by_user(&state.pool, user.id, 5)
+        .await
+        .unwrap_or_default();
 
-    if orders.is_empty() {
+    if orders.is_empty() && partner_orders.is_empty() {
         bot.send_message(
             chat_id,
-            "📦 Bạn chưa có đơn kích hoạt Gemini Pro nào. Gõ /pixel để đặt đơn ngay!",
+            "📦 Bạn chưa có đơn hàng nào. Gõ /pixel hoặc /shop để mua hàng ngay!",
         )
         .reply_markup(keyboards::back_to_home_keyboard())
         .await?;
         return Ok(());
     }
 
-    let mut lines = vec!["📦 <b>10 đơn kích hoạt gần nhất:</b>\n".to_string()];
-    for o in orders {
-        let icon = match o.status.as_str() {
-            "COMPLETED" => "✅",
-            "REFUNDED" => "↩️",
-            "PROCESSING" => "⚙️",
-            _ => "⏳",
-        };
-        let mut line = format!(
-            "{} <code>{}</code> | {} | <b>{} đ</b> | <i>{}</i>",
-            icon,
-            o.order_code,
-            messages::escape_html(&o.gmail_masked),
-            format_vnd(o.price_paid_vnd),
-            o.status
-        );
-        if let Some(ref res) = o.external_result {
-            if res.starts_with("http://") || res.starts_with("https://") {
-                line.push_str(&format!("\n   🔗 Link ưu đãi: <code>{}</code>", messages::escape_html(res)));
+    let mut lines = Vec::new();
+    if !orders.is_empty() {
+        lines.push("📦 <b>Đơn kích hoạt Gemini Pro gần nhất:</b>".to_string());
+        for o in orders {
+            let icon = match o.status.as_str() {
+                "COMPLETED" => "✅",
+                "REFUNDED" => "↩️",
+                "PROCESSING" => "⚙️",
+                _ => "⏳",
+            };
+            let mut line = format!(
+                "{} <code>{}</code> | {} | <b>{} đ</b> | <i>{}</i>",
+                icon,
+                o.order_code,
+                messages::escape_html(&o.gmail_masked),
+                format_vnd(o.price_paid_vnd),
+                o.status
+            );
+            if let Some(ref res) = o.external_result {
+                if res.starts_with("http://") || res.starts_with("https://") {
+                    line.push_str(&format!("\n   🔗 Link ưu đãi: <code>{}</code>", messages::escape_html(res)));
+                }
             }
+            lines.push(line);
         }
-        lines.push(line);
+    }
+
+    if !partner_orders.is_empty() {
+        if !lines.is_empty() {
+            lines.push(String::new());
+        }
+        lines.push("🛍️ <b>Đơn tài khoản &amp; Key gần nhất:</b>".to_string());
+        for po in partner_orders {
+            let icon = match po.status.as_str() {
+                "COMPLETED" => "✅",
+                "REFUNDED" => "↩️",
+                _ => "⚙️",
+            };
+            let mut line = format!(
+                "{} <code>{}</code> | {} x{} | <b>{} đ</b> | <i>{}</i>",
+                icon,
+                po.order_code,
+                messages::escape_html(&po.product_name),
+                po.quantity,
+                format_vnd(po.total_sell_price_vnd),
+                po.status
+            );
+            if po.status == "COMPLETED" {
+                let items = partner_shop_service::decrypt_order_items(state, &po);
+                for item in items.iter().take(3) {
+                    line.push_str(&format!("\n   🔑 <code>{}</code>", messages::escape_html(item)));
+                }
+            }
+            lines.push(line);
+        }
     }
 
     bot.send_message(chat_id, lines.join("\n"))

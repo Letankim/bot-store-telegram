@@ -9,7 +9,7 @@ use url::Url;
 use bot_store_telegram::{
     api, bot,
     config::{BotMode, Config},
-    services::smm_service,
+    services::{partner_shop_service, smm_service},
     state::AppState,
 };
 
@@ -59,8 +59,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let admin_bot = config.admin_bot_token.as_deref().map(Bot::new);
     let state = AppState::new(pool, tg_bot.clone(), admin_bot.clone(), config.clone());
 
-    // 5.5 Start Background FIFO Queue Worker for automatic paced pushing to upstream API
+    // 5.5 Start Background FIFO Queue Worker & Partner Shop Periodic Sync Worker
     smm_service::spawn_auto_queue_worker(state.clone());
+    partner_shop_service::spawn_partner_shop_sync_worker(state.clone());
 
     // 6. Configure Webhook or Launch Polling
     if config.bot_mode == BotMode::Webhook {

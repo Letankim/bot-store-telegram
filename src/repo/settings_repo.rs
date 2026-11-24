@@ -83,3 +83,62 @@ pub async fn update_settings(
 
     Ok(updated)
 }
+
+/// Update Partner Shop API configuration (`telebot.aidesign.io.vn/api/partner-api`)
+/// and immediately recalculate sell prices for all products using the default markup.
+pub async fn update_partner_shop_settings(
+    pool: &PgPool,
+    base_url: &str,
+    api_key: Option<&str>,
+    enabled: bool,
+    markup_vnd: i64,
+    sync_interval_secs: i32,
+    notify_changes: bool,
+) -> Result<AppSettings, AppError> {
+    if markup_vnd < 0 {
+        return Err(AppError::Validation(
+            "Giá chênh lệch (lợi nhuận) không được nhỏ hơn 0.".to_string(),
+        ));
+    }
+    let clamped_interval = sync_interval_secs.clamp(30, 86_400);
+    let clean_url = base_url.trim().trim_end_matches('/');
+    if clean_url.is_empty() {
+        return Err(AppError::Validation(
+            "Base URL Shop đối tác không được để trống.".to_string(),
+        ));
+    }
+
+    let updated = sqlx::query_as::<_, AppSettings>(
+        "UPDATE app_settings
+         SET partner_shop_base_url = $1,
+             partner_shop_api_key = COALESCE($2, partner_shop_api_key),
+             partner_shop_enabled = $3,
+             partner_shop_markup_vnd = $4,
+             partner_shop_sync_interval_secs = $5,
+             partner_shop_notify_changes = $6,
+             updated_at = NOW()
+         WHERE id = 1
+         RETURNING *",
+    )
+    .bind(clean_url)
+    .bind(api_key.map(str::trim).filter(|s| !s.is_empty()))
+    .bind(enabled)
+    .bind(markup_vnd)
+    .bind(clamped_interval)
+    .bind(notify_changes)
+    .fetch_one(pool)
+    .await?;
+
+    // Recalculate sell_price_vnd for all synced products that inherit the global markup
+    sqlx::query(
+        "UPDATE partner_products
+         SET sell_price_vnd = partner_price_vnd + $1,
+             updated_at = NOW()
+         WHERE custom_markup_vnd IS NULL",
+    )
+    .bind(markup_vnd)
+    .execute(pool)
+    .await?;
+
+    Ok(updated)
+}

@@ -21,12 +21,14 @@ use crate::{
     },
     domain::{
         gemini_plan::GeminiPlan,
+        partner_shop::PublicPartnerProduct,
         wallet::{WalletTransaction, format_vnd},
     },
     error::AppError,
-    repo::{activation_repo, plan_repo, settings_repo, user_repo, wallet_repo},
+    repo::{activation_repo, partner_repo, plan_repo, settings_repo, user_repo, wallet_repo},
     response::ApiResponse,
     services::{
+        partner_shop_service,
         payos_service::CheckPaymentStatus,
         referral_service::{self, ReferralSummary},
     },
@@ -130,6 +132,7 @@ pub struct PublicStoreSettings {
 #[derive(Debug, Serialize)]
 pub struct WebCatalogRes {
     pub plans: Vec<GeminiPlan>,
+    pub partner_products: Vec<PublicPartnerProduct>,
     pub settings: PublicStoreSettings,
 }
 
@@ -139,6 +142,12 @@ pub async fn get_catalog(
     Extension(ctx): Extension<RequestContext>,
 ) -> Result<ApiResponse<WebCatalogRes>, AppError> {
     let plans = plan_repo::list_active_plans(&state.pool).await?;
+    let partner_products: Vec<PublicPartnerProduct> = partner_repo::list_active_products(&state.pool)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(PublicPartnerProduct::from)
+        .collect();
     let s = settings_repo::get_settings(&state.pool).await?;
 
     let public_settings = PublicStoreSettings {
@@ -154,6 +163,7 @@ pub async fn get_catalog(
     Ok(ApiResponse::ok(
         WebCatalogRes {
             plans,
+            partner_products,
             settings: public_settings,
         },
         "Tải danh sách gói dịch vụ thành công",
@@ -753,6 +763,98 @@ pub async fn web_wallet_transactions(
     Ok(ApiResponse::ok(
         txs,
         "Lấy lịch sử ví thành công",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct WebBuyPartnerReq {
+    pub product_id: Uuid,
+    pub quantity: i32,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WebPartnerOrderView {
+    pub id: Uuid,
+    pub order_code: String,
+    pub product_name: String,
+    pub quantity: i32,
+    pub total_sell_price_vnd: i64,
+    pub status: String,
+    pub items: Vec<String>,
+    pub error_note: Option<String>,
+    pub created_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WebBuyPartnerRes {
+    pub order: WebPartnerOrderView,
+    pub remaining_balance_vnd: i64,
+}
+
+/// Purchase a synced Partner Shop product (account/key) directly from Website with instant delivery.
+pub async fn web_buy_partner_product(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Extension(WebAuthUser(user)): Extension<WebAuthUser>,
+    Json(payload): Json<WebBuyPartnerReq>,
+) -> Result<ApiResponse<WebBuyPartnerRes>, AppError> {
+    let outcome = partner_shop_service::purchase_partner_product(
+        &state,
+        user,
+        payload.product_id,
+        payload.quantity,
+    )
+    .await?;
+
+    Ok(ApiResponse::created(
+        WebBuyPartnerRes {
+            order: WebPartnerOrderView {
+                id: outcome.order.id,
+                order_code: outcome.order.order_code,
+                product_name: outcome.order.product_name,
+                quantity: outcome.order.quantity,
+                total_sell_price_vnd: outcome.order.total_sell_price_vnd,
+                status: outcome.order.status,
+                items: outcome.items,
+                error_note: outcome.order.error_note,
+                created_at: outcome.order.created_at,
+            },
+            remaining_balance_vnd: outcome.remaining_balance_vnd,
+        },
+        "Mua sản phẩm thành công! Thông tin tài khoản/key đã được giao ngay.",
+        ctx.request_id,
+    ))
+}
+
+/// List ONLY the authenticated user's own Partner Shop orders with decrypted delivered items.
+pub async fn web_list_partner_orders(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Extension(WebAuthUser(user)): Extension<WebAuthUser>,
+) -> Result<ApiResponse<Vec<WebPartnerOrderView>>, AppError> {
+    let orders = partner_repo::list_orders_by_user(&state.pool, user.id, 30).await?;
+    let views: Vec<WebPartnerOrderView> = orders
+        .into_iter()
+        .map(|o| {
+            let items = partner_shop_service::decrypt_order_items(&state, &o);
+            WebPartnerOrderView {
+                id: o.id,
+                order_code: o.order_code,
+                product_name: o.product_name,
+                quantity: o.quantity,
+                total_sell_price_vnd: o.total_sell_price_vnd,
+                status: o.status,
+                items,
+                error_note: o.error_note,
+                created_at: o.created_at,
+            }
+        })
+        .collect();
+
+    Ok(ApiResponse::ok(
+        views,
+        "Lấy lịch sử đơn tài khoản/key thành công",
         ctx.request_id,
     ))
 }

@@ -1,4 +1,6 @@
-use crate::domain::{gemini_plan::GeminiPlan, wallet::format_vnd};
+use crate::domain::{
+    gemini_plan::GeminiPlan, partner_shop::PartnerProduct, wallet::format_vnd,
+};
 
 /// Escape HTML special characters for Telegram `ParseMode::Html`.
 pub fn escape_html(input: &str) -> String {
@@ -235,5 +237,62 @@ pub fn maintenance_ended_broadcast_message(plan: &GeminiPlan) -> String {
          🚀 Bạn đã có thể đặt đơn ngay bây giờ!",
         format_vnd(plan.price_vnd),
         plan.available_stock,
+    )
+}
+
+pub fn partner_product_card(product: &PartnerProduct, support_handle: &str) -> String {
+    let icon = if product.emoji.is_empty() { "🛍️" } else { &product.emoji };
+    let maint_line = if product.is_maintenance {
+        "🔧 Trạng thái: <b>Đang bảo trì</b>\n"
+    } else {
+        ""
+    };
+    let cat_line = product
+        .category_name
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|c| format!("📂 Danh mục: <b>{}</b>\n", escape_html(c)))
+        .unwrap_or_default();
+    let desc_block = if product.description.trim().is_empty() {
+        "Giao tài khoản / key tự động ngay lập tức sau khi thanh toán.".to_string()
+    } else {
+        escape_html(product.description.trim())
+    };
+    let type_label = if product.product_type.eq_ignore_ascii_case("key") {
+        "Key kích hoạt"
+    } else {
+        "Tài khoản giao tự động"
+    };
+
+    format!(
+        "{icon} <b>{}</b>\n\
+         {cat_line}{maint_line}🏷️ Loại: <b>{type_label}</b>\n\
+         💸 Giá bán: <b>{} đ</b>\n\
+         📦 Tồn kho: <b>{} sản phẩm</b>\n\
+         📊 Đã bán: <b>{}</b>\n\n\
+         <blockquote>✏️ <b>Mô tả:</b>\n\
+         {desc_block}</blockquote>\n\n\
+         ⚡ Giao hàng tự động ngay lập tức 24/7.\n\
+         🛟 Hỗ trợ: {}",
+        escape_html(&product.name),
+        format_vnd(product.sell_price_vnd),
+        product.stock,
+        product.sold_count,
+        escape_html(support_handle),
+    )
+}
+
+pub fn partner_product_maintenance_message(product: &PartnerProduct) -> String {
+    let note = if product.maintenance_note.trim().is_empty() {
+        "Vui lòng thử lại sau."
+    } else {
+        product.maintenance_note.trim()
+    };
+    format!(
+        "🔧 <b>{} đang bảo trì</b>\n\
+         ══════════════════════════\n\n\
+         {}",
+        escape_html(&product.name),
+        escape_html(note),
     )
 }
