@@ -14,6 +14,8 @@ pub struct GeminiPlan {
     pub sold_count: i32,
     pub description_note: String,
     pub api_mode: String,
+    pub form_mode: String,
+    pub custom_field_label: String,
     pub is_active: bool,
     pub is_maintenance: bool,
     pub maintenance_note: String,

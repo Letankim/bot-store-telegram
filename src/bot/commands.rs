@@ -396,7 +396,7 @@ pub async fn handle_show_plans(
         let card = messages::gemini_plan_card(plan, &guide_url, &support_handle);
         bot.send_message(chat_id, card)
             .parse_mode(ParseMode::Html)
-            .reply_markup(keyboards::plan_detail_keyboard(&pid, &guide_url))
+            .reply_markup(keyboards::plan_detail_keyboard(&pid, &guide_url, &plan.form_mode))
             .await?;
     } else {
         bot.send_message(

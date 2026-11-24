@@ -374,6 +374,8 @@ async fn handle_pending_input(
                 None,
                 None,
                 None,
+                None,
+                None,
             )
             .await
             {
@@ -845,6 +847,8 @@ async fn handle_callback(
                 None,
                 None,
                 None,
+                None,
+                None,
                 Some(new_maint),
                 None,
             )
@@ -901,6 +905,8 @@ async fn handle_callback(
             if let Ok(updated) = plan_repo::update_plan_full(
                 &state.pool,
                 plan_id,
+                None,
+                None,
                 None,
                 None,
                 None,

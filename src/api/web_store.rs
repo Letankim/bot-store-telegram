@@ -498,10 +498,14 @@ pub async fn web_list_orders(
 #[derive(Debug, Deserialize)]
 pub struct WebCreateOrderReq {
     pub plan_id: Uuid,
+    #[serde(default)]
     pub email: String,
+    #[serde(default)]
     pub password: String,
+    #[serde(default)]
     pub two_fa_secret: String,
     pub backup_codes: Option<Vec<String>>,
+    pub custom_input: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -530,13 +534,17 @@ pub async fn web_create_order(
             &payload.password,
             &payload.two_fa_secret,
             payload.backup_codes.as_deref(),
+            payload.custom_input.as_deref(),
         )
         .await?;
 
-    let auto_push_enabled = settings_repo::get_settings(&state.pool)
-        .await
-        .map(|s| s.smm_auto_push && !s.smm_api_key.trim().is_empty())
-        .unwrap_or(false);
+    let eligible_auto_push =
+        outcome.plan.form_mode == "mail_pass_2fa" && outcome.plan.api_mode != "manual";
+    let auto_push_enabled = eligible_auto_push
+        && settings_repo::get_settings(&state.pool)
+            .await
+            .map(|s| s.smm_auto_push && !s.smm_api_key.trim().is_empty())
+            .unwrap_or(false);
 
     // Notify Admin via Telegram with exact copy-ready format
     if let Some(admin_id) = state.config.admin_telegram_id {

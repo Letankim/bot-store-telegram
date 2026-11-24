@@ -225,7 +225,11 @@ pub async fn handle_callback(
                 let card = messages::gemini_plan_card(&plan, &guide_url, &support_handle);
                 bot.send_message(chat_id, card)
                     .parse_mode(ParseMode::Html)
-                    .reply_markup(keyboards::plan_detail_keyboard(plan_id_str, &guide_url))
+                    .reply_markup(keyboards::plan_detail_keyboard(
+                        plan_id_str,
+                        &guide_url,
+                        &plan.form_mode,
+                    ))
                     .await?;
             }
         }
@@ -302,24 +306,104 @@ pub async fn handle_callback(
                     &quick_amounts,
                 ))
                 .await?;
+        } else if plan.form_mode == "none" {
+            let text = format!(
+                "✅ <b>Số dư hợp lệ ({} đ)!</b>\n\n\
+                 • Sản phẩm: <b>{}</b>\n\
+                 • Giá thanh toán: <b>{} đ</b>\n\
+                 • Sản phẩm này <b>không cần điền form</b>.\n\n\
+                 👇 Bấm nút bên dưới để xác nhận thanh toán ngay:",
+                format_vnd(balance),
+                messages::escape_html(&plan.name),
+                format_vnd(plan.price_vnd),
+            );
+            bot.send_message(chat_id, text)
+                .parse_mode(ParseMode::Html)
+                .reply_markup(keyboards::direct_buy_confirm_keyboard(
+                    plan_id_str,
+                    plan.price_vnd,
+                ))
+                .await?;
         } else {
             let activate_url = state.config.activate_url(plan_id_str);
             let guide_url = state.config.guide_url(Some(plan_id_str));
+            let prompt_line = match plan.form_mode.as_str() {
+                "email_only" => "👇 Bấm nút <b>Mở form nhập Email</b> bên dưới để điền email và đặt đơn:",
+                "custom_note" => "👇 Bấm nút <b>Mở form nhập thông tin</b> bên dưới để điền thông tin và đặt đơn:",
+                _ => "👇 Bấm nút <b>Mở form điền Mail | Pass | 2FA</b> bên dưới để nhập thông tin kích hoạt:",
+            };
             let text = format!(
                 "✅ <b>Số dư hợp lệ ({} đ)!</b>\n\n\
                  Gói đã chọn: <b>{}</b> (Giá: <b>{} đ</b>)\n\
-                 👇 Bấm nút <b>Mở form điền Mail | Pass | 2FA</b> bên dưới để nhập thông tin kích hoạt:",
+                 {}",
                 format_vnd(balance),
                 messages::escape_html(&plan.name),
-                format_vnd(plan.price_vnd)
+                format_vnd(plan.price_vnd),
+                prompt_line
             );
             bot.send_message(chat_id, text)
                 .parse_mode(ParseMode::Html)
                 .reply_markup(keyboards::open_activate_webapp_keyboard(
                     &activate_url,
                     &guide_url,
+                    &plan.form_mode,
                 ))
                 .await?;
+        }
+        return Ok(());
+    }
+
+    if let Some(plan_id_str) = data.strip_prefix("buy_direct:") {
+        let Ok(plan_id) = Uuid::parse_str(plan_id_str) else {
+            return Ok(());
+        };
+        match state
+            .activation_service
+            .submit_activation_order(telegram_id, plan_id, "", "", "", None, None)
+            .await
+        {
+            Ok(outcome) => {
+                let customer_msg = format!(
+                    "✅ <b>Đặt đơn hàng thành công!</b>\n\n\
+                     • Mã đơn: <code>{}</code>\n\
+                     • Sản phẩm: <b>{}</b>\n\
+                     • Đã thanh toán: <b>{} đ</b>\n\
+                     • Số dư còn lại: <b>{} đ</b>\n\n\
+                     ⏳ Đơn hàng của bạn đã được tiếp nhận và gửi cho quản trị viên xử lý ngay!",
+                    outcome.order.order_code,
+                    messages::escape_html(&outcome.plan.name),
+                    format_vnd(outcome.order.price_paid_vnd),
+                    format_vnd(outcome.remaining_balance_vnd),
+                );
+                bot.send_message(chat_id, customer_msg)
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(keyboards::back_to_home_keyboard())
+                    .await?;
+
+                if let Some(admin_id) = state.config.admin_telegram_id {
+                    let admin_msg = format!(
+                        "🔔 <b>ĐƠN MUA TRỰC TIẾP MỚI (KHÔNG FORM)!</b>\n\
+                         • Mã đơn: <code>{}</code>\n\
+                         • Gói: <b>{}</b> ({} đ)\n\
+                         • Khách: {} (ID: <code>{}</code>)\n\
+                         📥 Trạng thái: <b>PENDING</b> (chờ Admin xử lý thủ công trên /admin)",
+                        outcome.order.order_code,
+                        messages::escape_html(&outcome.plan.name),
+                        format_vnd(outcome.order.price_paid_vnd),
+                        messages::escape_html(&outcome.user.full_name),
+                        outcome.user.telegram_id,
+                    );
+                    let _ = bot
+                        .send_message(ChatId(admin_id), admin_msg)
+                        .parse_mode(ParseMode::Html)
+                        .await;
+                }
+            }
+            Err(err) => {
+                bot.send_message(chat_id, format!("❌ Không thể đặt đơn: {err}"))
+                    .reply_markup(keyboards::back_to_home_keyboard())
+                    .await?;
+            }
         }
         return Ok(());
     }

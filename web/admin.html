@@ -832,12 +832,26 @@
                 <input id="newPlanOrder" type="number" value="3" />
               </div>
               <div class="form-group">
-                <label>Loại xử lý API (Auto pay / Tự pay)</label>
+                <label>Loại xử lý API</label>
                 <select id="newPlanApiMode" style="width:100%;">
                   <option value="autopay">Auto pay (autopay — kích hoạt tự động)</option>
                   <option value="extract">Tự pay (extract — trích xuất link ưu đãi)</option>
                   <option value="payadd">Payadd (thêm phương thức thanh toán)</option>
+                  <option value="manual">Xử lý thủ công (Admin tự xử lý — không đẩy API)</option>
                 </select>
+              </div>
+              <div class="form-group">
+                <label>Yêu cầu form khi khách mua</label>
+                <select id="newPlanFormMode" style="width:100%;" onchange="onNewPlanFormModeChange(this.value)">
+                  <option value="mail_pass_2fa">Form đầy đủ: Email | Mật khẩu | 2FA (+ Backup Codes)</option>
+                  <option value="email_only">Chỉ cần nhập Email (VD: mời Family, Canva, ChatGPT...)</option>
+                  <option value="custom_note">Nhập 1 ô thông tin tùy chỉnh (Username / Link / Ghi chú)</option>
+                  <option value="none">Không cần điền form (bấm mua &amp; thanh toán ngay)</option>
+                </select>
+              </div>
+              <div class="form-group" style="grid-column: 1 / -1;">
+                <label>Nhãn hướng dẫn ô nhập (tùy chọn — dùng khi chọn Chỉ Email hoặc Tùy chỉnh)</label>
+                <input id="newPlanCustomLabel" type="text" placeholder="VD: Nhập địa chỉ Email nhận lời mời Family / Canva Pro..." />
               </div>
               <div class="form-group" style="grid-column: 1 / -1;">
                 <label>Mô tả chi tiết hiển thị trên Bot</label>
@@ -1553,7 +1567,15 @@
     function formatApiModeLabel(mode) {
       if (mode === "extract") return "Tự pay (extract)";
       if (mode === "payadd") return "Payadd";
+      if (mode === "manual") return "Xử lý thủ công";
       return "Auto pay (autopay)";
+    }
+
+    function formatFormModeLabel(fm) {
+      if (fm === "email_only") return "Chỉ nhập Email";
+      if (fm === "custom_note") return "Ô thông tin tùy chỉnh";
+      if (fm === "none") return "Không cần form";
+      return "Mail | Pass | 2FA";
     }
 
     function updateSelectedCount() {
@@ -1639,8 +1661,8 @@
           ${apiErrText ? `<div style="margin:8px 0;padding:9px 12px;border-radius:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;font-size:0.82rem;line-height:1.5;word-break:break-word;"><i class="bx bx-error-circle"></i> <strong>Lý do lỗi từ API:</strong> ${escapeAttr(apiErrText)}</div>` : ''}
           ${o.status === "PENDING" || o.status === "PROCESSING" ? `
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;">
-              ${o.status === "PENDING" ? `<button class="btn btn-primary" onclick="pushOrderApi('${o.id}')"><i class="bx bx-rocket"></i> Đẩy qua API (${o.plan_api_mode})</button>` : ''}
-              ${o.status === "PROCESSING" && isApiFailed ? `<button class="btn btn-primary" onclick="pushOrderApi('${o.id}')"><i class="bx bx-refresh"></i> Thử đẩy lại qua API (${o.plan_api_mode})</button>` : ''}
+              ${o.status === "PENDING" && o.plan_api_mode !== "manual" && (o.plan_form_mode || "mail_pass_2fa") === "mail_pass_2fa" ? `<button class="btn btn-primary" onclick="pushOrderApi('${o.id}')"><i class="bx bx-rocket"></i> Đẩy qua API (${o.plan_api_mode})</button>` : ''}
+              ${o.status === "PROCESSING" && isApiFailed && o.plan_api_mode !== "manual" ? `<button class="btn btn-primary" onclick="pushOrderApi('${o.id}')"><i class="bx bx-refresh"></i> Thử đẩy lại qua API (${o.plan_api_mode})</button>` : ''}
               <button class="btn btn-ok" onclick="completeOrder('${o.id}')"><i class="bx bx-check-double"></i> Hoàn tất &amp; báo khách</button>
               <button class="btn btn-danger" onclick="refundOrder('${o.id}')"><i class="bx bx-undo"></i> Hoàn tiền 100% đơn lỗi</button>
             </div>
@@ -1754,6 +1776,13 @@
       box.style.display = box.style.display === "none" ? "block" : "none";
     }
 
+    function onNewPlanFormModeChange(fm) {
+      const apiSel = document.getElementById("newPlanApiMode");
+      if (fm !== "mail_pass_2fa" && apiSel) {
+        apiSel.value = "manual";
+      }
+    }
+
     async function createNewPlan() {
       const payload = {
         code: document.getElementById("newPlanCode").value.trim(),
@@ -1763,6 +1792,8 @@
         available_stock: Number(document.getElementById("newPlanStock").value),
         display_order: Number(document.getElementById("newPlanOrder").value),
         api_mode: document.getElementById("newPlanApiMode").value,
+        form_mode: document.getElementById("newPlanFormMode").value,
+        custom_field_label: document.getElementById("newPlanCustomLabel").value.trim(),
         description_note: document.getElementById("newPlanDesc").value.trim()
       };
       const json = await apiFetch("/api/v1/admin/plans", {
@@ -1819,12 +1850,26 @@
               <input id="order_${p.id}" type="number" value="${p.display_order}" />
             </div>
             <div class="form-group">
-              <label>Loại xử lý API (Auto pay / Tự pay)</label>
+              <label>Loại xử lý API</label>
               <select id="apimode_${p.id}" style="width:100%;">
                 <option value="autopay" ${p.api_mode === 'autopay' ? 'selected' : ''}>Auto pay (autopay — kích hoạt tự động)</option>
                 <option value="extract" ${p.api_mode === 'extract' ? 'selected' : ''}>Tự pay (extract — trích xuất link ưu đãi)</option>
                 <option value="payadd" ${p.api_mode === 'payadd' ? 'selected' : ''}>Payadd (thêm phương thức thanh toán)</option>
+                <option value="manual" ${p.api_mode === 'manual' ? 'selected' : ''}>Xử lý thủ công (không đẩy API)</option>
               </select>
+            </div>
+            <div class="form-group">
+              <label>Yêu cầu form khi khách mua</label>
+              <select id="formmode_${p.id}" style="width:100%;">
+                <option value="mail_pass_2fa" ${(p.form_mode || 'mail_pass_2fa') === 'mail_pass_2fa' ? 'selected' : ''}>Form đầy đủ: Email | Mật khẩu | 2FA</option>
+                <option value="email_only" ${p.form_mode === 'email_only' ? 'selected' : ''}>Chỉ cần nhập Email</option>
+                <option value="custom_note" ${p.form_mode === 'custom_note' ? 'selected' : ''}>Nhập 1 ô thông tin tùy chỉnh</option>
+                <option value="none" ${p.form_mode === 'none' ? 'selected' : ''}>Không cần điền form (mua ngay)</option>
+              </select>
+            </div>
+            <div class="form-group" style="grid-column: 1 / -1;">
+              <label>Nhãn hướng dẫn ô nhập (tùy chọn — cho chế độ Chỉ Email / Tùy chỉnh)</label>
+              <input id="customlbl_${p.id}" type="text" value="${escapeAttr(p.custom_field_label || '')}" placeholder="VD: Nhập địa chỉ Email nhận lời mời Family / Canva Pro..." />
             </div>
             <div class="form-group">
               <label>Trạng thái hiển thị</label>
@@ -1878,6 +1923,8 @@
         duration_months: Number(document.getElementById("months_" + id).value),
         display_order: Number(document.getElementById("order_" + id).value),
         api_mode: document.getElementById("apimode_" + id).value,
+        form_mode: document.getElementById("formmode_" + id).value,
+        custom_field_label: document.getElementById("customlbl_" + id).value.trim(),
         is_active: document.getElementById("active_" + id).value === "true",
         is_maintenance: document.getElementById("maint_" + id).value === "true",
         maintenance_note: document.getElementById("maintnote_" + id).value.trim() || "Vui lòng thử lại sau.",

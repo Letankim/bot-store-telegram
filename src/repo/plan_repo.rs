@@ -85,13 +85,15 @@ pub async fn create_plan(
     available_stock: i32,
     description_note: &str,
     api_mode: &str,
+    form_mode: &str,
+    custom_field_label: &str,
     display_order: i32,
 ) -> Result<GeminiPlan, AppError> {
     let created = sqlx::query_as::<_, GeminiPlan>(
         "INSERT INTO gemini_plans (
             code, name, duration_months, price_vnd, available_stock, sold_count,
-            description_note, api_mode, is_active, display_order
-         ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, TRUE, $8)
+            description_note, api_mode, form_mode, custom_field_label, is_active, display_order
+         ) VALUES ($1, $2, $3, $4, $5, 0, $6, $7, $8, $9, TRUE, $10)
          RETURNING *",
     )
     .bind(code.trim().to_uppercase())
@@ -101,6 +103,8 @@ pub async fn create_plan(
     .bind(available_stock)
     .bind(description_note.trim())
     .bind(api_mode)
+    .bind(form_mode)
+    .bind(custom_field_label.trim())
     .bind(display_order)
     .fetch_one(pool)
     .await?;
@@ -119,6 +123,8 @@ pub async fn update_plan_full(
     sold_count: Option<i32>,
     description_note: Option<&str>,
     api_mode: Option<&str>,
+    form_mode: Option<&str>,
+    custom_field_label: Option<&str>,
     display_order: Option<i32>,
     is_active: Option<bool>,
     is_maintenance: Option<bool>,
@@ -133,12 +139,14 @@ pub async fn update_plan_full(
              sold_count = COALESCE($5, sold_count),
              description_note = COALESCE($6, description_note),
              api_mode = COALESCE($7, api_mode),
-             display_order = COALESCE($8, display_order),
-             is_active = COALESCE($9, is_active),
-             is_maintenance = COALESCE($10, is_maintenance),
-             maintenance_note = COALESCE($11, maintenance_note),
+             form_mode = COALESCE($8, form_mode),
+             custom_field_label = COALESCE($9, custom_field_label),
+             display_order = COALESCE($10, display_order),
+             is_active = COALESCE($11, is_active),
+             is_maintenance = COALESCE($12, is_maintenance),
+             maintenance_note = COALESCE($13, maintenance_note),
              updated_at = NOW()
-         WHERE id = $12
+         WHERE id = $14
          RETURNING *",
     )
     .bind(name.map(str::trim))
@@ -148,6 +156,8 @@ pub async fn update_plan_full(
     .bind(sold_count)
     .bind(description_note.map(str::trim))
     .bind(api_mode)
+    .bind(form_mode)
+    .bind(custom_field_label.map(str::trim))
     .bind(display_order)
     .bind(is_active)
     .bind(is_maintenance)

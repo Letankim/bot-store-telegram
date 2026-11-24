@@ -647,34 +647,43 @@
       </div>
 
       <form id="orderForm" onsubmit="submitWebOrder(event)">
-        <div class="form-group">
+        <div id="omQuickPasteWrap" class="form-group">
           <label>Dán nhanh chuỗi chuẩn (tuỳ chọn)</label>
           <input id="omQuickPaste" type="text" placeholder="email@gmail.com | matkhau | 2fa_32_ky_tu" oninput="handleQuickPaste()" />
         </div>
-        <div class="form-group">
-          <label>1. Địa chỉ Gmail cần kích hoạt</label>
+        <div id="omEmailWrap" class="form-group">
+          <label id="omEmailLabel">1. Địa chỉ Gmail cần kích hoạt</label>
           <input id="omEmail" type="email" required placeholder="customer@gmail.com" />
         </div>
-        <div class="form-group">
-          <label>2. Mật khẩu Gmail</label>
-          <input id="omPassword" type="password" required placeholder="Nhập mật khẩu Gmail" />
+        <div id="omCustomWrap" class="form-group" style="display:none;">
+          <label id="omCustomLabel">Thông tin theo yêu cầu</label>
+          <textarea id="omCustomInput" rows="3" placeholder="Nhập thông tin cần thiết cho đơn hàng..."></textarea>
         </div>
-        <div class="form-group">
-          <label>3. Khóa bí mật 2FA (32 ký tự Base32)</label>
-          <input id="omTwoFa" type="text" required placeholder="VD: ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl" oninput="refreshOrderOtp()" />
-          <div id="omOtpChip" class="otp-chip">
-            <span><i class="bx bx-check-shield"></i> Mã OTP 6 số đang khớp:</span>
-            <span id="omOtpCode" style="font-family:monospace;font-size:1rem;">--- ---</span>
+        <div id="omNoneNotice" style="display:none;background:var(--primary-soft);border:1px solid #bfdbfe;border-radius:10px;padding:10px 12px;margin-bottom:14px;font-size:0.84rem;color:#1e3a8a;">
+          <i class="bx bx-check-shield"></i> Sản phẩm này <strong>không cần điền form</strong> — bấm xác nhận bên dưới để thanh toán và đặt đơn ngay.
+        </div>
+        <div id="omFullCredsWrap">
+          <div class="form-group">
+            <label>2. Mật khẩu Gmail</label>
+            <input id="omPassword" type="password" required placeholder="Nhập mật khẩu Gmail" />
           </div>
-          <div class="hint">Không nhập mã OTP 6 số — hãy nhập khóa bí mật 32 ký tự (xem <a href="/webapp/guide" target="_blank" rel="noopener">hướng dẫn 7 bước</a>).</div>
+          <div class="form-group">
+            <label>3. Khóa bí mật 2FA (32 ký tự Base32)</label>
+            <input id="omTwoFa" type="text" required placeholder="VD: ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl" oninput="refreshOrderOtp()" />
+            <div id="omOtpChip" class="otp-chip">
+              <span><i class="bx bx-check-shield"></i> Mã OTP 6 số đang khớp:</span>
+              <span id="omOtpCode" style="font-family:monospace;font-size:1rem;">--- ---</span>
+            </div>
+            <div class="hint">Không nhập mã OTP 6 số — hãy nhập khóa bí mật 32 ký tự (xem <a href="/webapp/guide" target="_blank" rel="noopener">hướng dẫn 7 bước</a>).</div>
+          </div>
+          <div class="form-group">
+            <label>4. Backup Codes (tuỳ chọn — 2 đến 3 mã 8 chữ số, mỗi dòng 1 mã)</label>
+            <textarea id="omBackupCodes" rows="3" placeholder="12345678&#10;98765432"></textarea>
+          </div>
         </div>
-        <div class="form-group">
-          <label>4. Backup Codes (tuỳ chọn — 2 đến 3 mã 8 chữ số, mỗi dòng 1 mã)</label>
-          <textarea id="omBackupCodes" rows="3" placeholder="12345678&#10;98765432"></textarea>
-        </div>
-        <label style="display:flex;align-items:flex-start;gap:8px;font-size:0.82rem;color:#334155;margin-bottom:14px;cursor:pointer;">
+        <label id="omConfirmWrap" style="display:flex;align-items:flex-start;gap:8px;font-size:0.82rem;color:#334155;margin-bottom:14px;cursor:pointer;">
           <input id="omConfirmChk" type="checkbox" required style="width:17px;height:17px;margin-top:2px;accent-color:#2563eb;" />
-          <span>Tôi xác nhận đã đóng Hồ sơ thanh toán (HSTT) cũ, nhập đúng Mail | Pass | 2FA và đồng ý trừ tiền từ ví để kích hoạt.</span>
+          <span id="omConfirmText">Tôi xác nhận đã đóng Hồ sơ thanh toán (HSTT) cũ, nhập đúng Mail | Pass | 2FA và đồng ý trừ tiền từ ví để kích hoạt.</span>
         </label>
         <button id="omSubmitBtn" type="submit" class="btn btn-ok" style="width:100%;">
           <i class="bx bx-check-shield"></i> Xác nhận &amp; thanh toán ngay
@@ -1128,9 +1137,37 @@
         return;
       }
       selectedPlan = plan;
+      const fm = plan.form_mode || "mail_pass_2fa";
+      const customLbl = (plan.custom_field_label || "").trim();
+      const isFull = fm === "mail_pass_2fa";
+      const isEmailOnly = fm === "email_only";
+      const isCustom = fm === "custom_note";
+      const isNone = fm === "none";
+
       document.getElementById("omTitle").textContent = plan.name;
       document.getElementById("omPrice").textContent = fmtVnd(plan.price_vnd);
       document.getElementById("omBalance").textContent = fmtVnd(currentUser.balance_vnd);
+      document.getElementById("omQuickPasteWrap").style.display = isFull ? "block" : "none";
+      document.getElementById("omEmailWrap").style.display = (isFull || isEmailOnly) ? "block" : "none";
+      document.getElementById("omCustomWrap").style.display = isCustom ? "block" : "none";
+      document.getElementById("omNoneNotice").style.display = isNone ? "block" : "none";
+      document.getElementById("omFullCredsWrap").style.display = isFull ? "block" : "none";
+
+      document.getElementById("omEmail").required = (isFull || isEmailOnly);
+      document.getElementById("omPassword").required = isFull;
+      document.getElementById("omTwoFa").required = isFull;
+      document.getElementById("omCustomInput").required = isCustom;
+      document.getElementById("omEmailLabel").textContent = isEmailOnly
+        ? (customLbl || "Địa chỉ Email cần nâng cấp / nhận lời mời")
+        : "1. Địa chỉ Gmail cần kích hoạt";
+      if (isCustom) {
+        document.getElementById("omCustomLabel").textContent = customLbl || "Thông tin theo yêu cầu";
+        document.getElementById("omCustomInput").placeholder = customLbl || "Nhập thông tin cần thiết...";
+      }
+      document.getElementById("omConfirmText").textContent = isFull
+        ? "Tôi xác nhận đã đóng Hồ sơ thanh toán (HSTT) cũ, nhập đúng Mail | Pass | 2FA và đồng ý trừ tiền từ ví để kích hoạt."
+        : "Tôi xác nhận thông tin đã nhập là chính xác và đồng ý thanh toán từ số dư ví.";
+
       const lowBal = currentUser.balance_vnd < plan.price_vnd;
       document.getElementById("omLowBalBox").style.display = lowBal ? "block" : "none";
       document.getElementById("omSubmitBtn").disabled = lowBal;
@@ -1192,10 +1229,13 @@
     async function submitWebOrder(e) {
       e.preventDefault();
       if (!selectedPlan) return;
-      const rawCodes = document.getElementById("omBackupCodes").value
-        .split(/\r?\n/)
-        .map(s => s.replace(/\s+/g, "").trim())
-        .filter(Boolean);
+      const fm = selectedPlan.form_mode || "mail_pass_2fa";
+      const rawCodes = fm === "mail_pass_2fa"
+        ? document.getElementById("omBackupCodes").value
+            .split(/\r?\n/)
+            .map(s => s.replace(/\s+/g, "").trim())
+            .filter(Boolean)
+        : [];
 
       const btn = document.getElementById("omSubmitBtn");
       btn.disabled = true;
@@ -1203,10 +1243,11 @@
         method: "POST",
         body: JSON.stringify({
           plan_id: selectedPlan.id,
-          email: document.getElementById("omEmail").value.trim(),
-          password: document.getElementById("omPassword").value,
-          two_fa_secret: document.getElementById("omTwoFa").value.trim(),
-          backup_codes: rawCodes.length ? rawCodes : null
+          email: (fm === "mail_pass_2fa" || fm === "email_only") ? document.getElementById("omEmail").value.trim() : "",
+          password: fm === "mail_pass_2fa" ? document.getElementById("omPassword").value : "",
+          two_fa_secret: fm === "mail_pass_2fa" ? document.getElementById("omTwoFa").value.trim() : "",
+          backup_codes: rawCodes.length ? rawCodes : null,
+          custom_input: fm === "custom_note" ? document.getElementById("omCustomInput").value.trim() : null
         })
       });
       btn.disabled = false;

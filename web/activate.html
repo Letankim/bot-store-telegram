@@ -347,21 +347,22 @@
     <!-- Main Form -->
     <form id="activationForm" class="card">
       <!-- Quick Paste -->
-      <div class="field">
-        <div class="field-label">
-          <span class="field-label-left"><i class="bx bx-bolt-circle"></i> Dán nhanh (Tùy chọn)</span>
-          <span style="font-size:0.75rem;color:var(--muted);font-weight:500;">Tự động tách 3 ô</span>
+      <div id="quickPasteSection">
+        <div class="field">
+          <div class="field-label">
+            <span class="field-label-left"><i class="bx bx-bolt-circle"></i> Dán nhanh (Tùy chọn)</span>
+            <span style="font-size:0.75rem;color:var(--muted);font-weight:500;">Tự động tách 3 ô</span>
+          </div>
+          <input id="quickPaste" class="mono" type="text" placeholder="customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5..." />
         </div>
-        <input id="quickPaste" class="mono" type="text" placeholder="customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5..." />
+        <hr style="border:none;border-top:1px solid var(--border);margin:14px 0;" />
       </div>
 
-      <hr style="border:none;border-top:1px solid var(--border);margin:14px 0;" />
-
       <!-- Email -->
-      <div class="field">
+      <div id="emailFieldWrap" class="field">
         <div class="field-label">
-          <span class="field-label-left"><i class="bx bx-envelope"></i> 1. Địa chỉ Gmail *</span>
-          <span class="help-tag" onclick="toggleHint('hintEmail')">Lưu ý tài khoản</span>
+          <span id="emailLabelText" class="field-label-left"><i class="bx bx-envelope"></i> 1. Địa chỉ Gmail *</span>
+          <span id="emailHelpTag" class="help-tag" onclick="toggleHint('hintEmail')">Lưu ý tài khoản</span>
         </div>
         <input id="email" type="email" required placeholder="customer1@gmail.com" autocomplete="off" />
         <div id="hintEmail" class="hint-box">
@@ -370,74 +371,90 @@
         </div>
       </div>
 
-      <!-- Password -->
-      <div class="field">
+      <!-- Custom Note Input (shown ONLY when form_mode === 'custom_note') -->
+      <div id="customInputWrap" class="field" style="display:none;">
         <div class="field-label">
-          <span class="field-label-left"><i class="bx bx-lock-alt"></i> 2. Mật khẩu Gmail *</span>
-          <span class="help-tag" onclick="toggleHint('hintPass')">Bảo mật</span>
+          <span id="customLabelText" class="field-label-left"><i class="bx bx-edit"></i> Thông tin yêu cầu *</span>
         </div>
-        <div class="input-wrap">
-          <input id="password" type="password" required placeholder="Nhập mật khẩu Gmail" autocomplete="off" style="padding-right:64px;" />
-          <button type="button" class="toggle-pass" onclick="togglePassword()">Hiện</button>
-        </div>
-        <div id="hintPass" class="hint-box">
-          • Nhập chính xác mật khẩu hiện tại (phân biệt chữ hoa/thường).<br/>
-          • Dữ liệu được mã hóa chuẩn <strong>AES-256-GCM</strong> ngay khi gửi lên hệ thống.
-        </div>
+        <textarea id="customInput" rows="3" placeholder="Nhập thông tin theo yêu cầu của gói..."></textarea>
       </div>
 
-      <!-- 2FA Secret -->
-      <div class="field">
-        <div class="field-label">
-          <span class="field-label-left"><i class="bx bx-key"></i> 3. Mã khóa 2FA (32 ký tự) *</span>
-          <span class="help-tag" onclick="toggleHint('hint2fa')">Lấy ở đâu?</span>
-        </div>
-        <input id="twoFa" class="mono" type="text" required placeholder="ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl" autocomplete="off" />
-        <div id="hint2fa" class="hint-box">
-          • Vào cài đặt Authenticator Google &rarr; bấm <strong>+ Thiết lập Authenticator</strong> &rarr; chọn <strong>"Không thể quét được mã?"</strong> để copy chuỗi 32 ký tự.<br/>
-          • Tuyệt đối không nhập mã 6 số đổi mỗi 30 giây!
-        </div>
-        <div id="otpLive" class="otp-live">
-          <span><i class="bx bx-check-circle"></i> Mã 2FA hợp lệ • OTP 6 số: <strong id="otpDigits">------</strong></span>
-          <span id="otpTimer" style="font-weight:700;">30s</span>
-        </div>
+      <!-- No-Form Direct Purchase Info (shown ONLY when form_mode === 'none') -->
+      <div id="noFormNotice" style="display:none;background:var(--primary-soft);border:1px solid #bfdbfe;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:0.86rem;color:#1e3a8a;">
+        <i class="bx bx-check-shield"></i> Sản phẩm này <strong>không yêu cầu điền thông tin</strong>. Bạn chỉ cần bấm nút xác nhận thanh toán bên dưới để đặt đơn ngay!
       </div>
 
-      <!-- Backup Codes -->
-      <div class="field">
-        <div class="field-label">
-          <span class="field-label-left"><i class="bx bx-shield-plus"></i> 4. Backup Codes <span style="font-size:0.72rem;font-weight:600;background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:6px;border:1px solid #e2e8f0;">tuỳ chọn</span></span>
-          <span class="help-tag" onclick="toggleHint('hintBackup')">Lấy ở đâu?</span>
+      <!-- Full Mail|Pass|2FA extra fields -->
+      <div id="fullCredsWrap">
+        <!-- Password -->
+        <div class="field">
+          <div class="field-label">
+            <span class="field-label-left"><i class="bx bx-lock-alt"></i> 2. Mật khẩu Gmail *</span>
+            <span class="help-tag" onclick="toggleHint('hintPass')">Bảo mật</span>
+          </div>
+          <div class="input-wrap">
+            <input id="password" type="password" required placeholder="Nhập mật khẩu Gmail" autocomplete="off" style="padding-right:64px;" />
+            <button type="button" class="toggle-pass" onclick="togglePassword()">Hiện</button>
+          </div>
+          <div id="hintPass" class="hint-box">
+            • Nhập chính xác mật khẩu hiện tại (phân biệt chữ hoa/thường).<br/>
+            • Dữ liệu được mã hóa chuẩn <strong>AES-256-GCM</strong> ngay khi gửi lên hệ thống.
+          </div>
         </div>
-        <textarea id="backupCodes" class="mono" rows="3" placeholder="Mỗi code một dòng, VD:&#10;12345678&#10;98765432" autocomplete="off"></textarea>
-        <div style="font-size:0.76rem;color:var(--muted);margin-top:5px;">
-          <i class="bx bx-info-circle"></i> Mỗi dòng một mã, cần <strong>2–3 mã</strong>; mỗi mã gồm <strong>đúng 8 chữ số</strong> (nếu copy từ Google dạng <code>1234 5678</code> hệ thống tự chuẩn hóa).
-        </div>
-        <div id="backupStatus" style="display:none;margin-top:6px;font-size:0.79rem;font-weight:600;"></div>
-        <div id="hintBackup" class="hint-box">
-          • Vào cài đặt bảo mật Google &rarr; <strong>Xác minh 2 bước</strong> &rarr; chọn mục <strong>Mã dự phòng (Backup codes)</strong> &rarr; bấm <strong>Thiết lập / Tạo mã mới</strong>.<br/>
-          • Copy <strong>2 hoặc 3 mã</strong> gồm 8 chữ số dán vào đây (mỗi mã 1 dòng) để giúp hệ thống vượt bước xác minh mượt hơn khi Google yêu cầu mã dự phòng.
-        </div>
-      </div>
 
-      <!-- Live Preview -->
-      <div class="field">
-        <div class="field-label">
-          <span class="field-label-left"><i class="bx bx-code-alt"></i> Định dạng chuẩn sẽ gửi lên hệ thống</span>
+        <!-- 2FA Secret -->
+        <div class="field">
+          <div class="field-label">
+            <span class="field-label-left"><i class="bx bx-key"></i> 3. Mã khóa 2FA (32 ký tự) *</span>
+            <span class="help-tag" onclick="toggleHint('hint2fa')">Lấy ở đâu?</span>
+          </div>
+          <input id="twoFa" class="mono" type="text" required placeholder="ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl" autocomplete="off" />
+          <div id="hint2fa" class="hint-box">
+            • Vào cài đặt Authenticator Google &rarr; bấm <strong>+ Thiết lập Authenticator</strong> &rarr; chọn <strong>"Không thể quét được mã?"</strong> để copy chuỗi 32 ký tự.<br/>
+            • Tuyệt đối không nhập mã 6 số đổi mỗi 30 giây!
+          </div>
+          <div id="otpLive" class="otp-live">
+            <span><i class="bx bx-check-circle"></i> Mã 2FA hợp lệ • OTP 6 số: <strong id="otpDigits">------</strong></span>
+            <span id="otpTimer" style="font-weight:700;">30s</span>
+          </div>
         </div>
-        <div id="previewBox" class="preview-box">customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl</div>
-      </div>
 
-      <!-- Checklist -->
-      <div class="checklist-box">
-        <label class="check-item">
-          <input id="chkWhite" type="checkbox" required />
-          <span>Tôi xác nhận Gmail là <strong>tài khoản trắng</strong>, chưa dùng Google One / Gemini Pro và <strong>không ở trong nhóm Google Family</strong>.</span>
-        </label>
-        <label class="check-item">
-          <input id="chkHstt" type="checkbox" required />
-          <span>Tôi đã <strong>đóng sạch hồ sơ thanh toán (HSTT)</strong> cũ và bật 2FA (Authenticator 32 ký tự) đúng theo hướng dẫn.</span>
-        </label>
+        <!-- Backup Codes -->
+        <div class="field">
+          <div class="field-label">
+            <span class="field-label-left"><i class="bx bx-shield-plus"></i> 4. Backup Codes <span style="font-size:0.72rem;font-weight:600;background:#f1f5f9;color:#64748b;padding:2px 7px;border-radius:6px;border:1px solid #e2e8f0;">tuỳ chọn</span></span>
+            <span class="help-tag" onclick="toggleHint('hintBackup')">Lấy ở đâu?</span>
+          </div>
+          <textarea id="backupCodes" class="mono" rows="3" placeholder="Mỗi code một dòng, VD:&#10;12345678&#10;98765432" autocomplete="off"></textarea>
+          <div style="font-size:0.76rem;color:var(--muted);margin-top:5px;">
+            <i class="bx bx-info-circle"></i> Mỗi dòng một mã, cần <strong>2–3 mã</strong>; mỗi mã gồm <strong>đúng 8 chữ số</strong> (nếu copy từ Google dạng <code>1234 5678</code> hệ thống tự chuẩn hóa).
+          </div>
+          <div id="backupStatus" style="display:none;margin-top:6px;font-size:0.79rem;font-weight:600;"></div>
+          <div id="hintBackup" class="hint-box">
+            • Vào cài đặt bảo mật Google &rarr; <strong>Xác minh 2 bước</strong> &rarr; chọn mục <strong>Mã dự phòng (Backup codes)</strong> &rarr; bấm <strong>Thiết lập / Tạo mã mới</strong>.<br/>
+            • Copy <strong>2 hoặc 3 mã</strong> gồm 8 chữ số dán vào đây (mỗi mã 1 dòng) để giúp hệ thống vượt bước xác minh mượt hơn khi Google yêu cầu mã dự phòng.
+          </div>
+        </div>
+
+        <!-- Live Preview -->
+        <div class="field">
+          <div class="field-label">
+            <span class="field-label-left"><i class="bx bx-code-alt"></i> Định dạng chuẩn sẽ gửi lên hệ thống</span>
+          </div>
+          <div id="previewBox" class="preview-box">customer1@gmail.com | abcxyz | ydwx xcpo 4q4q zye5 fdpt ti3w ungl mggl</div>
+        </div>
+
+        <!-- Checklist -->
+        <div class="checklist-box">
+          <label class="check-item">
+            <input id="chkWhite" type="checkbox" required />
+            <span>Tôi xác nhận Gmail là <strong>tài khoản trắng</strong>, chưa dùng Google One / Gemini Pro và <strong>không ở trong nhóm Google Family</strong>.</span>
+          </label>
+          <label class="check-item">
+            <input id="chkHstt" type="checkbox" required />
+            <span>Tôi đã <strong>đóng sạch hồ sơ thanh toán (HSTT)</strong> cũ và bật 2FA (Authenticator 32 ký tự) đúng theo hướng dẫn.</span>
+          </label>
+        </div>
       </div>
 
       <button id="submitBtn" class="btn-submit" type="submit" disabled>
@@ -462,6 +479,52 @@
     const initData = tg ? tg.initData : "";
     let canAfford = false;
     let activePlanId = planId;
+    let activeFormMode = "mail_pass_2fa";
+
+    function applyFormMode(plan) {
+      activeFormMode = plan.form_mode || "mail_pass_2fa";
+      const customLabel = (plan.custom_field_label || "").trim();
+      const guideBanner = document.getElementById("guideLink");
+      const quickSec = document.getElementById("quickPasteSection");
+      const emailWrap = document.getElementById("emailFieldWrap");
+      const customWrap = document.getElementById("customInputWrap");
+      const noFormNotice = document.getElementById("noFormNotice");
+      const fullWrap = document.getElementById("fullCredsWrap");
+      const emailHelpTag = document.getElementById("emailHelpTag");
+      const emailLabelText = document.getElementById("emailLabelText");
+      const customLabelText = document.getElementById("customLabelText");
+      const customInputEl = document.getElementById("customInput");
+      const chkWhite = document.getElementById("chkWhite");
+      const chkHstt = document.getElementById("chkHstt");
+
+      const isFull = activeFormMode === "mail_pass_2fa";
+      const isEmailOnly = activeFormMode === "email_only";
+      const isCustom = activeFormMode === "custom_note";
+      const isNone = activeFormMode === "none";
+
+      guideBanner.style.display = isFull ? "flex" : "none";
+      quickSec.style.display = isFull ? "block" : "none";
+      fullWrap.style.display = isFull ? "block" : "none";
+      emailWrap.style.display = (isFull || isEmailOnly) ? "block" : "none";
+      emailHelpTag.style.display = isFull ? "inline-flex" : "none";
+      customWrap.style.display = isCustom ? "block" : "none";
+      noFormNotice.style.display = isNone ? "block" : "none";
+
+      emailEl.required = (isFull || isEmailOnly);
+      passEl.required = isFull;
+      twoFaEl.required = isFull;
+      chkWhite.required = isFull;
+      chkHstt.required = isFull;
+      customInputEl.required = isCustom;
+
+      if (isEmailOnly) {
+        emailLabelText.innerHTML = `<i class="bx bx-envelope"></i> ${customLabel || "Địa chỉ Email cần nâng cấp / nhận lời mời"} *`;
+        emailEl.placeholder = "tenban@gmail.com";
+      } else if (isCustom) {
+        customLabelText.innerHTML = `<i class="bx bx-edit"></i> ${customLabel || "Thông tin yêu cầu cho đơn hàng"} *`;
+        customInputEl.placeholder = customLabel || "Nhập thông tin theo yêu cầu...";
+      }
+    }
 
     const emailEl = document.getElementById("email");
     const passEl = document.getElementById("password");
@@ -636,9 +699,16 @@
         }
         const d = json.data;
         activePlanId = d.plan.id;
+        applyFormMode(d.plan);
         const eyebrowEl = document.getElementById("planEyebrow");
         if (eyebrowEl) {
-          if (d.plan.api_mode === "payadd") {
+          if (d.plan.form_mode === "email_only") {
+            eyebrowEl.textContent = "Đặt dịch vụ (chỉ cần nhập Email)";
+          } else if (d.plan.form_mode === "custom_note") {
+            eyebrowEl.textContent = "Đặt dịch vụ theo yêu cầu";
+          } else if (d.plan.form_mode === "none") {
+            eyebrowEl.textContent = "Đặt mua trực tiếp";
+          } else if (d.plan.api_mode === "payadd") {
             eyebrowEl.textContent = "Dịch vụ thêm PaySafeCard tự động";
           } else if (d.plan.api_mode === "extract") {
             eyebrowEl.textContent = "Dịch vụ trích xuất link ưu đãi";
@@ -677,30 +747,38 @@
     document.getElementById("activationForm").addEventListener("submit", async (ev) => {
       ev.preventDefault();
       if (!canAfford) return;
-      const rawB = backupEl.value.trim();
-      const { codes: parsedBackupCodes, hasInvalid: badBackup } = parseBackupCodes(rawB);
-      if (rawB && (badBackup || parsedBackupCodes.length < 2 || parsedBackupCodes.length > 3)) {
-        showAlert("Backup Codes không hợp lệ: nếu nhập, vui lòng điền từ 2 đến 3 mã (mỗi mã đúng 8 chữ số).", "error");
-        return;
+
+      let parsedBackupCodes = [];
+      if (activeFormMode === "mail_pass_2fa") {
+        const rawB = backupEl.value.trim();
+        const parsedB = parseBackupCodes(rawB);
+        if (rawB && (parsedB.hasInvalid || parsedB.codes.length < 2 || parsedB.codes.length > 3)) {
+          showAlert("Backup Codes không hợp lệ: nếu nhập, vui lòng điền từ 2 đến 3 mã (mỗi mã đúng 8 chữ số).", "error");
+          return;
+        }
+        parsedBackupCodes = parsedB.codes;
       }
 
       submitBtn.disabled = true;
-      submitBtn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> <span>Đang mã hóa &amp; gửi đơn...</span>';
+      submitBtn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> <span>Đang xử lý &amp; gửi đơn...</span>';
 
       try {
+        const customInputVal = (document.getElementById("customInput")?.value || "").trim();
+        const payloadBody = {
+          plan_id: activePlanId,
+          email: activeFormMode === "mail_pass_2fa" || activeFormMode === "email_only" ? emailEl.value.trim() : "",
+          password: activeFormMode === "mail_pass_2fa" ? passEl.value.trim() : "",
+          two_fa_secret: activeFormMode === "mail_pass_2fa" ? normalizeTwoFa(twoFaEl.value) : "",
+          backup_codes: activeFormMode === "mail_pass_2fa" && parsedBackupCodes.length ? parsedBackupCodes : null,
+          custom_input: activeFormMode === "custom_note" ? customInputVal : null
+        };
         const res = await fetch("/api/v1/webapp/activations", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Telegram-Init-Data": initData
           },
-          body: JSON.stringify({
-            plan_id: activePlanId,
-            email: emailEl.value.trim(),
-            password: passEl.value.trim(),
-            two_fa_secret: normalizeTwoFa(twoFaEl.value),
-            backup_codes: parsedBackupCodes.length ? parsedBackupCodes : null
-          })
+          body: JSON.stringify(payloadBody)
         });
         const json = await res.json();
         if (!json.success) {

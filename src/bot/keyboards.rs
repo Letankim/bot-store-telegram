@@ -54,24 +54,32 @@ pub fn plan_selector_keyboard(plans: &[GeminiPlan]) -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(rows)
 }
 
-/// Inline keyboard attached under the Gemini Pro detail card.
-pub fn plan_detail_keyboard(plan_id: &str, guide_url: &str) -> InlineKeyboardMarkup {
+/// Inline keyboard attached under the product detail card.
+pub fn plan_detail_keyboard(plan_id: &str, guide_url: &str, form_mode: &str) -> InlineKeyboardMarkup {
+    let cta_label = match form_mode {
+        "none" => "🛒 Kiểm tra số dư & mua ngay",
+        "email_only" => "📧 Kiểm tra số dư & nhập Email mua ngay",
+        "custom_note" => "📝 Kiểm tra số dư & điền thông tin mua ngay",
+        _ => "🚀 Kiểm tra số dư & kích hoạt ngay",
+    };
     let mut rows = vec![vec![InlineKeyboardButton::callback(
-        "🚀 Kiểm tra số dư & kích hoạt ngay",
+        cta_label,
         format!("chk_act:{plan_id}"),
     )]];
 
-    if let Ok(parsed) = Url::parse(guide_url) {
-        if parsed.scheme() == "https" {
-            rows.push(vec![InlineKeyboardButton::web_app(
-                "📘 Xem hướng dẫn đóng HSTT & lấy 2FA",
-                WebAppInfo { url: parsed },
-            )]);
-        } else {
-            rows.push(vec![InlineKeyboardButton::url(
-                "📘 Xem hướng dẫn đóng HSTT & lấy 2FA",
-                parsed,
-            )]);
+    if form_mode == "mail_pass_2fa" {
+        if let Ok(parsed) = Url::parse(guide_url) {
+            if parsed.scheme() == "https" {
+                rows.push(vec![InlineKeyboardButton::web_app(
+                    "📘 Xem hướng dẫn đóng HSTT & lấy 2FA",
+                    WebAppInfo { url: parsed },
+                )]);
+            } else {
+                rows.push(vec![InlineKeyboardButton::url(
+                    "📘 Xem hướng dẫn đóng HSTT & lấy 2FA",
+                    parsed,
+                )]);
+            }
         }
     }
 
@@ -87,32 +95,37 @@ pub fn plan_detail_keyboard(plan_id: &str, guide_url: &str) -> InlineKeyboardMar
 pub fn open_activate_webapp_keyboard(
     activate_url: &str,
     guide_url: &str,
+    form_mode: &str,
 ) -> InlineKeyboardMarkup {
+    let form_btn_label = match form_mode {
+        "email_only" => "📧 Mở form nhập Email",
+        "custom_note" => "📝 Mở form nhập thông tin",
+        _ => "📝 Mở form điền Mail | Pass | 2FA",
+    };
     let mut rows = Vec::new();
     if let Ok(url) = Url::parse(activate_url) {
         if url.scheme() == "https" {
             rows.push(vec![InlineKeyboardButton::web_app(
-                "📝 Mở form điền Mail | Pass | 2FA",
+                form_btn_label,
                 WebAppInfo { url },
             )]);
         } else {
-            rows.push(vec![InlineKeyboardButton::url(
-                "📝 Mở form điền Mail | Pass | 2FA",
-                url,
-            )]);
+            rows.push(vec![InlineKeyboardButton::url(form_btn_label, url)]);
         }
     }
-    if let Ok(url) = Url::parse(guide_url) {
-        if url.scheme() == "https" {
-            rows.push(vec![InlineKeyboardButton::web_app(
-                "📘 Xem hướng dẫn 6 bước (đóng HSTT & 2FA)",
-                WebAppInfo { url },
-            )]);
-        } else {
-            rows.push(vec![InlineKeyboardButton::url(
-                "📘 Xem hướng dẫn 6 bước (đóng HSTT & 2FA)",
-                url,
-            )]);
+    if form_mode == "mail_pass_2fa" {
+        if let Ok(url) = Url::parse(guide_url) {
+            if url.scheme() == "https" {
+                rows.push(vec![InlineKeyboardButton::web_app(
+                    "📘 Xem hướng dẫn 7 bước (đóng HSTT & 2FA)",
+                    WebAppInfo { url },
+                )]);
+            } else {
+                rows.push(vec![InlineKeyboardButton::url(
+                    "📘 Xem hướng dẫn 7 bước (đóng HSTT & 2FA)",
+                    url,
+                )]);
+            }
         }
     }
     rows.push(vec![
@@ -120,6 +133,20 @@ pub fn open_activate_webapp_keyboard(
         InlineKeyboardButton::callback("⬅️ Menu chính", "back:home"),
     ]);
     InlineKeyboardMarkup::new(rows)
+}
+
+/// Inline keyboard for `form_mode == "none"` direct confirmation without opening any form.
+pub fn direct_buy_confirm_keyboard(plan_id: &str, price_vnd: i64) -> InlineKeyboardMarkup {
+    InlineKeyboardMarkup::new(vec![
+        vec![InlineKeyboardButton::callback(
+            format!("✅ Xác nhận thanh toán ngay ({} đ)", format_vnd(price_vnd)),
+            format!("buy_direct:{plan_id}"),
+        )],
+        vec![
+            InlineKeyboardButton::callback("⏪ Chọn gói khác", "back:plans"),
+            InlineKeyboardButton::callback("⬅️ Menu chính", "back:home"),
+        ],
+    ])
 }
 
 /// Inline keyboard for quick VietQR top-up amounts + Custom amount input + Back.

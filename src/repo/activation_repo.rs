@@ -161,16 +161,20 @@ pub async fn find_by_id(
     Ok(order)
 }
 
-/// Fetch the oldest PENDING order that has not yet been submitted (FIFO persistent queue).
+/// Fetch the oldest PENDING order eligible for automatic upstream Pixel API push (FIFO queue).
+/// Excludes manual products and products whose `form_mode != 'mail_pass_2fa'`.
 pub async fn find_next_queued_pending(
     pool: &PgPool,
 ) -> Result<Option<ActivationOrder>, AppError> {
     let order = sqlx::query_as::<_, ActivationOrder>(
-        "SELECT * FROM activation_orders
-         WHERE status = 'PENDING'
-           AND external_job_id IS NULL
-           AND (external_status IS NULL OR external_status = 'queued')
-         ORDER BY created_at ASC
+        "SELECT o.* FROM activation_orders o
+         JOIN gemini_plans p ON p.id = o.plan_id
+         WHERE o.status = 'PENDING'
+           AND o.external_job_id IS NULL
+           AND (o.external_status IS NULL OR o.external_status = 'queued')
+           AND p.form_mode = 'mail_pass_2fa'
+           AND p.api_mode <> 'manual'
+         ORDER BY o.created_at ASC
          LIMIT 1",
     )
     .fetch_optional(pool)

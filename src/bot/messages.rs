@@ -110,24 +110,39 @@ pub fn gemini_plan_card(plan: &GeminiPlan, guide_url: &str, support_handle: &str
     } else {
         ""
     };
+    let form_req_line = match plan.form_mode.as_str() {
+        "email_only" => "📝 Yêu cầu khi mua: <b>Chỉ cần nhập Email</b>\n",
+        "custom_note" => "📝 Yêu cầu khi mua: <b>Điền thông tin theo yêu cầu</b>\n",
+        "none" => "📝 Yêu cầu khi mua: <b>Không cần điền form — thanh toán ngay</b>\n",
+        _ => "📝 Yêu cầu khi mua: <b>Mail | Pass | 2FA</b>\n",
+    };
+    let guide_line = if plan.form_mode == "mail_pass_2fa" {
+        format!(
+            "\n- Hướng dẫn đóng HSTT &amp; gắn 2FA: <a href=\"{}\">Xem trang hướng dẫn chi tiết tại đây</a>",
+            escape_html(guide_url)
+        )
+    } else {
+        String::new()
+    };
+
     format!(
         "🔹 <b>{}</b>\n\
-         {}💸 Giá: <b>{} đ</b>\n\
+         {}{}💸 Giá: <b>{} đ</b>\n\
          📦 Tồn kho: <b>{} tài khoản</b>\n\
          📊 Đã bán: <b>{} tài khoản</b>\n\n\
          <blockquote>✏️ <b>Mô tả:</b>\n\
-         {}\n\
-         - Hướng dẫn đóng HSTT &amp; gắn 2FA: <a href=\"{}\">Xem trang hướng dẫn chi tiết tại đây</a></blockquote>\n\n\
+         {}{}</blockquote>\n\n\
          ‼️ Vui lòng đọc kỹ tiêu đề sản phẩm &amp; mô tả trước khi mua hàng.\n\
          Chỉ hỗ trợ refund với những đơn hàng lỗi.\n\
          Hỗ trợ: {}",
         escape_html(&plan.name),
         maintenance_line,
+        form_req_line,
         format_vnd(plan.price_vnd),
         plan.available_stock,
         plan.sold_count,
         escape_html(&plan.description_note),
-        escape_html(guide_url),
+        guide_line,
         escape_html(support_handle)
     )
 }

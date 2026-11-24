@@ -244,10 +244,12 @@ pub struct CreatePlanReq {
     pub available_stock: i32,
     pub description_note: String,
     pub api_mode: Option<String>,
+    pub form_mode: Option<String>,
+    pub custom_field_label: Option<String>,
     pub display_order: Option<i32>,
 }
 
-/// Create a new Gemini Pro plan from Admin Dashboard.
+/// Create a new product/plan from Admin Dashboard with configurable form requirements.
 pub async fn create_plan(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
@@ -264,10 +266,23 @@ pub async fn create_plan(
         ));
     }
 
-    let api_mode = payload.api_mode.as_deref().unwrap_or("autopay");
-    if !matches!(api_mode, "autopay" | "payadd" | "extract") {
+    let form_mode = payload.form_mode.as_deref().unwrap_or("mail_pass_2fa");
+    if !matches!(form_mode, "mail_pass_2fa" | "email_only" | "custom_note" | "none") {
         return Err(AppError::Validation(
-            "Chế độ API gói chỉ hỗ trợ: autopay, payadd, hoặc extract.".to_string(),
+            "Chế độ form chỉ hỗ trợ: mail_pass_2fa, email_only, custom_note, hoặc none."
+                .to_string(),
+        ));
+    }
+
+    let default_api_mode = if form_mode == "mail_pass_2fa" {
+        "autopay"
+    } else {
+        "manual"
+    };
+    let api_mode = payload.api_mode.as_deref().unwrap_or(default_api_mode);
+    if !matches!(api_mode, "autopay" | "payadd" | "extract" | "manual") {
+        return Err(AppError::Validation(
+            "Chế độ xử lý gói chỉ hỗ trợ: autopay, payadd, extract, hoặc manual.".to_string(),
         ));
     }
 
@@ -280,6 +295,8 @@ pub async fn create_plan(
         payload.available_stock,
         &payload.description_note,
         api_mode,
+        form_mode,
+        payload.custom_field_label.as_deref().unwrap_or(""),
         payload.display_order.unwrap_or(10),
     )
     .await?;
@@ -895,6 +912,8 @@ pub struct UpdatePlanReq {
     pub sold_count: Option<i32>,
     pub description_note: Option<String>,
     pub api_mode: Option<String>,
+    pub form_mode: Option<String>,
+    pub custom_field_label: Option<String>,
     pub display_order: Option<i32>,
     pub is_active: Option<bool>,
     pub is_maintenance: Option<bool>,
@@ -903,7 +922,7 @@ pub struct UpdatePlanReq {
     pub notify_maintenance: Option<bool>,
 }
 
-/// Update full details of a Gemini Pro plan (name, price, stock, sold count, description, api_mode, status).
+/// Update full details of a product/plan (name, price, stock, sold count, description, api_mode, form_mode, status).
 /// Automatically broadcasts restock or maintenance status notifications to all active users when enabled.
 pub async fn update_plan(
     State(state): State<SharedState>,
@@ -912,9 +931,17 @@ pub async fn update_plan(
     Json(payload): Json<UpdatePlanReq>,
 ) -> Result<ApiResponse<GeminiPlan>, AppError> {
     if let Some(mode) = payload.api_mode.as_deref() {
-        if !matches!(mode, "autopay" | "payadd" | "extract") {
+        if !matches!(mode, "autopay" | "payadd" | "extract" | "manual") {
             return Err(AppError::Validation(
-                "Chế độ API gói chỉ hỗ trợ: autopay, payadd, hoặc extract.".to_string(),
+                "Chế độ xử lý gói chỉ hỗ trợ: autopay, payadd, extract, hoặc manual.".to_string(),
+            ));
+        }
+    }
+    if let Some(fm) = payload.form_mode.as_deref() {
+        if !matches!(fm, "mail_pass_2fa" | "email_only" | "custom_note" | "none") {
+            return Err(AppError::Validation(
+                "Chế độ form chỉ hỗ trợ: mail_pass_2fa, email_only, custom_note, hoặc none."
+                    .to_string(),
             ));
         }
     }
@@ -933,6 +960,8 @@ pub async fn update_plan(
         payload.sold_count,
         payload.description_note.as_deref(),
         payload.api_mode.as_deref(),
+        payload.form_mode.as_deref(),
+        payload.custom_field_label.as_deref(),
         payload.display_order,
         payload.is_active,
         payload.is_maintenance,

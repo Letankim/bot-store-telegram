@@ -147,6 +147,90 @@ impl NormalizedCredentials {
         })
     }
 
+    /// Build validated order input according to the product's configured `form_mode`:
+    /// - `"mail_pass_2fa"`: strict Gmail | Password | 32-char Base32 2FA (+ optional Backup Codes)
+    /// - `"email_only"`: only a valid email address (any domain, e.g. invite Family/Canva/ChatGPT)
+    /// - `"custom_note"`: a single custom text input (username, link, note, etc.)
+    /// - `"none"`: no form fields required (instant direct purchase)
+    pub fn build_for_form_mode(
+        form_mode: &str,
+        email: &str,
+        password: &str,
+        two_fa_raw: &str,
+        backup_codes_raw: Option<&[String]>,
+        custom_input: Option<&str>,
+    ) -> Result<Self, AppError> {
+        match form_mode {
+            "email_only" => {
+                let raw = if !email.trim().is_empty() {
+                    email.trim()
+                } else {
+                    custom_input.unwrap_or("").trim()
+                };
+                let email_clean = raw.to_lowercase();
+                let valid = email_clean.len() >= 5
+                    && email_clean.len() <= 250
+                    && !email_clean.contains(char::is_whitespace)
+                    && !email_clean.contains('|')
+                    && email_clean
+                        .split_once('@')
+                        .map(|(l, d)| !l.is_empty() && d.contains('.') && !d.starts_with('.') && !d.ends_with('.'))
+                        .unwrap_or(false);
+                if !valid {
+                    return Err(AppError::Validation(
+                        "Vui lòng nhập địa chỉ email hợp lệ (ví dụ: tenban@gmail.com).".to_string(),
+                    ));
+                }
+                let gmail_masked = mask_gmail(&email_clean);
+                Ok(Self {
+                    email: email_clean.clone(),
+                    password: String::new(),
+                    two_fa_secret: String::new(),
+                    two_fa_compact_upper: String::new(),
+                    backup_codes: Vec::new(),
+                    formatted_line: email_clean,
+                    gmail_masked,
+                })
+            }
+            "custom_note" => {
+                let raw = custom_input
+                    .map(str::trim)
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| email.trim());
+                if raw.is_empty() || raw.len() > 500 {
+                    return Err(AppError::Validation(
+                        "Vui lòng nhập thông tin theo yêu cầu (từ 1 đến 500 ký tự).".to_string(),
+                    ));
+                }
+                let preview: String = raw.chars().take(48).collect();
+                let gmail_masked = if raw.chars().count() > 48 {
+                    format!("{preview}...")
+                } else {
+                    preview
+                };
+                Ok(Self {
+                    email: String::new(),
+                    password: String::new(),
+                    two_fa_secret: String::new(),
+                    two_fa_compact_upper: String::new(),
+                    backup_codes: Vec::new(),
+                    formatted_line: raw.to_string(),
+                    gmail_masked,
+                })
+            }
+            "none" => Ok(Self {
+                email: String::new(),
+                password: String::new(),
+                two_fa_secret: String::new(),
+                two_fa_compact_upper: String::new(),
+                backup_codes: Vec::new(),
+                formatted_line: "Không yêu cầu thông tin (mua trực tiếp)".to_string(),
+                gmail_masked: "Mua trực tiếp".to_string(),
+            }),
+            _ => Self::build(email, password, two_fa_raw, backup_codes_raw),
+        }
+    }
+
     /// Parse back a decrypted line `email | pass | 2fa [| code1,code2]`.
     pub fn parse_formatted(line: &str) -> Result<Self, AppError> {
         let parts: Vec<&str> = line.split('|').map(str::trim).collect();
@@ -219,5 +303,34 @@ mod tests {
     fn test_reject_six_digit_otp() {
         let err = NormalizedCredentials::build("customer1@gmail.com", "abcxyz", "123456", None);
         assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_dynamic_form_modes() {
+        let email_only = NormalizedCredentials::build_for_form_mode(
+            "email_only",
+            "User@Company.com",
+            "",
+            "",
+            None,
+            None,
+        )
+        .unwrap();
+        assert_eq!(email_only.formatted_line, "user@company.com");
+
+        let custom = NormalizedCredentials::build_for_form_mode(
+            "custom_note",
+            "",
+            "",
+            "",
+            None,
+            Some("@my_canva_account"),
+        )
+        .unwrap();
+        assert_eq!(custom.formatted_line, "@my_canva_account");
+
+        let direct =
+            NormalizedCredentials::build_for_form_mode("none", "", "", "", None, None).unwrap();
+        assert_eq!(direct.gmail_masked, "Mua trực tiếp");
     }
 }

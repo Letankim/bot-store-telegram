@@ -95,10 +95,14 @@ pub async fn webapp_me(
 #[derive(Debug, Deserialize)]
 pub struct SubmitActivationReq {
     pub plan_id: Uuid,
+    #[serde(default)]
     pub email: String,
+    #[serde(default)]
     pub password: String,
+    #[serde(default)]
     pub two_fa_secret: String,
     pub backup_codes: Option<Vec<String>>,
+    pub custom_input: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -135,14 +139,18 @@ pub async fn submit_activation(
             &payload.password,
             &payload.two_fa_secret,
             payload.backup_codes.as_deref(),
+            payload.custom_input.as_deref(),
         )
         .await?;
 
-    // Check whether auto-queue pushing is enabled (handled smoothly by background FIFO queue worker)
-    let auto_push_enabled = settings_repo::get_settings(&state.pool)
-        .await
-        .map(|s| s.smm_auto_push && !s.smm_api_key.trim().is_empty())
-        .unwrap_or(false);
+    // Check whether auto-queue pushing applies (only for mail_pass_2fa + non-manual plans)
+    let eligible_auto_push =
+        outcome.plan.form_mode == "mail_pass_2fa" && outcome.plan.api_mode != "manual";
+    let auto_push_enabled = eligible_auto_push
+        && settings_repo::get_settings(&state.pool)
+            .await
+            .map(|s| s.smm_auto_push && !s.smm_api_key.trim().is_empty())
+            .unwrap_or(false);
 
     let status_note = if auto_push_enabled {
         "🚀 Đơn hàng đã vào hàng đợi tự động — hệ thống sẽ lần lượt đẩy xử lý sau vài giây và hiện tiến trình 6 bước ngay bên dưới!"

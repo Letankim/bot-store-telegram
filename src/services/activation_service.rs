@@ -27,6 +27,7 @@ pub struct AdminOrderView {
     pub plan_id: Uuid,
     pub plan_name: String,
     pub plan_api_mode: String,
+    pub plan_form_mode: String,
     pub price_paid_vnd: i64,
     pub gmail_masked: String,
     pub credentials_formatted: String,
@@ -63,8 +64,9 @@ impl ActivationService {
         Self { pool, crypto }
     }
 
-    /// Submit a new Gemini Pro activation order from Telegram Mini App.
+    /// Submit a new product order from Telegram Mini App or direct Telegram buy.
     /// Runs balance verification, stock decrement, wallet debit, AES-256-GCM encryption in 1 ACID tx.
+    #[allow(clippy::too_many_arguments)]
     pub async fn submit_activation_order(
         &self,
         telegram_id: i64,
@@ -73,6 +75,7 @@ impl ActivationService {
         password: &str,
         two_fa_raw: &str,
         backup_codes: Option<&[String]>,
+        custom_input: Option<&str>,
     ) -> Result<SubmittedOrderOutcome, AppError> {
         let user = user_repo::find_by_telegram_id(&self.pool, telegram_id)
             .await?
@@ -89,11 +92,13 @@ impl ActivationService {
             password,
             two_fa_raw,
             backup_codes,
+            custom_input,
         )
         .await
     }
 
-    /// Submit a new Gemini Pro activation order for an authenticated User (Web or Telegram).
+    /// Submit a new product order for an authenticated User (Web or Telegram).
+    #[allow(clippy::too_many_arguments)]
     pub async fn submit_activation_order_for_user(
         &self,
         user: User,
@@ -102,15 +107,13 @@ impl ActivationService {
         password: &str,
         two_fa_raw: &str,
         backup_codes: Option<&[String]>,
+        custom_input: Option<&str>,
     ) -> Result<SubmittedOrderOutcome, AppError> {
         if user.is_banned {
             return Err(AppError::Forbidden(
                 "Tài khoản của bạn đã bị khóa, không thể đặt đơn.".to_string(),
             ));
         }
-
-        let normalized = NormalizedCredentials::build(email, password, two_fa_raw, backup_codes)?;
-        let (ciphertext, nonce) = self.crypto.encrypt(&normalized.formatted_line)?;
 
         let current_plan = plan_repo::find_by_id(&self.pool, plan_id)
             .await?
@@ -127,6 +130,16 @@ impl ActivationService {
                 current_plan.name, note
             )));
         }
+
+        let normalized = NormalizedCredentials::build_for_form_mode(
+            &current_plan.form_mode,
+            email,
+            password,
+            two_fa_raw,
+            backup_codes,
+            custom_input,
+        )?;
+        let (ciphertext, nonce) = self.crypto.encrypt(&normalized.formatted_line)?;
 
         let mut tx = self.pool.begin().await?;
 
@@ -233,6 +246,9 @@ impl ActivationService {
                 plan_api_mode: plan
                     .map(|p| p.api_mode.clone())
                     .unwrap_or_else(|| "autopay".to_string()),
+                plan_form_mode: plan
+                    .map(|p| p.form_mode.clone())
+                    .unwrap_or_else(|| "mail_pass_2fa".to_string()),
                 price_paid_vnd: order.price_paid_vnd,
                 gmail_masked: order.gmail_masked,
                 credentials_formatted: decrypted,
