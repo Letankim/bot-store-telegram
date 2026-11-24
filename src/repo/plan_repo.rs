@@ -107,7 +107,17 @@ pub async fn create_plan(
     .bind(custom_field_label.trim())
     .bind(display_order)
     .fetch_one(pool)
-    .await?;
+    .await
+    .map_err(|e| {
+        if let sqlx::Error::Database(db_err) = &e {
+            if db_err.is_unique_violation() {
+                return AppError::Conflict(
+                    "Mã gói (code) này đã tồn tại. Vui lòng chọn mã gói khác.".to_string(),
+                );
+            }
+        }
+        AppError::Database(e)
+    })?;
 
     Ok(created)
 }
