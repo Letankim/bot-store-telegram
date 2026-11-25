@@ -983,9 +983,9 @@
               <div class="form-hint">Worker Python sẽ tự cập nhật trạng thái Bật/Tắt trong vòng 15 giây mà không cần deploy lại.</div>
             </div>
             <div class="form-group">
-              <label><i class="bx bx-link"></i> URL Worker Auto-Sync (Render Web Service)</label>
-              <input id="psWorkerUrl" type="text" placeholder="https://bot-store-auto-sync.onrender.com" />
-              <div class="form-hint">Điền URL dịch vụ <code>bot-store-auto-sync</code> trên Render để nút <strong>Đồng bộ ngay</strong> kích hoạt quét lịch sử Bot đối tác.</div>
+              <label><i class="bx bx-link"></i> URL Worker Auto-Sync (tùy chọn — để trống dùng chung server này)</label>
+              <input id="psWorkerUrl" type="text" placeholder="Để trống = dùng Auto-Sync tích hợp sẵn chung server này" />
+              <div class="form-hint">Chỉ cần thêm 4 biến <code>TG_API_ID</code>, <code>TG_API_HASH</code>, <code>TG_STRING_SESSION</code>, <code>PARTNER_BOT_USERNAMES</code> ngay trên Render hiện tại — không cần tạo service thứ 2!</div>
             </div>
             <div class="form-group">
               <label><i class="bx bx-trending-up"></i> Giá chênh lệch / lời mặc định mỗi sản phẩm (VND)</label>
@@ -1374,9 +1374,9 @@
           <input id="msMarkupVnd" type="number" min="0" step="1000" value="30000" />
         </div>
         <div class="form-group" style="grid-column: 1 / -1;">
-          <label><i class="bx bx-link"></i> URL Worker Auto-Sync trên Render (để bấm Đồng bộ ngay)</label>
-          <input id="msWorkerUrl" type="text" placeholder="https://bot-store-auto-sync.onrender.com" />
-          <div class="form-hint">Dán URL dịch vụ <code>bot-store-auto-sync</code> từ Render Dashboard vào đây.</div>
+          <label><i class="bx bx-link"></i> URL Worker Auto-Sync (tùy chọn — để trống dùng chung server này)</label>
+          <input id="msWorkerUrl" type="text" placeholder="Để trống = dùng Auto-Sync tích hợp sẵn chung server này" />
+          <div class="form-hint">Gôm chung 1 dịch vụ Render duy nhất: chỉ cần thêm 4 biến <code>TG_API_ID</code>, <code>TG_API_HASH</code>, <code>TG_STRING_SESSION</code>, <code>PARTNER_BOT_USERNAMES</code> vào Environment là chạy tự động.</div>
         </div>
         <div class="form-group">
           <label><i class="bx bx-power-off"></i> Tự động sync API Shop đối tác định kỳ</label>

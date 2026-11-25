@@ -1535,9 +1535,30 @@ pub async fn sync_all_partner_sources(
         (None, "API đối tác: chưa điền API Key".to_string())
     };
 
-    // 2. Telethon Auto-Sync Worker on-demand scan (if auto_sync_worker_url configured)
-    let worker_url = settings.auto_sync_worker_url.trim().trim_end_matches('/');
-    let worker_sync = if !worker_url.is_empty() {
+    // 2. Telethon Auto-Sync Worker on-demand scan:
+    //    - Uses explicit `auto_sync_worker_url` if set in /admin.
+    //    - Otherwise automatically uses built-in local sidecar (`http://127.0.0.1:18080`)
+    //      when TG_STRING_SESSION is configured on the same Render service!
+    let explicit_worker_url = settings.auto_sync_worker_url.trim().trim_end_matches('/');
+    let has_builtin_sidecar = std::env::var("TG_STRING_SESSION")
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false)
+        && std::env::var("PARTNER_BOT_USERNAMES")
+            .map(|v| !v.trim().is_empty())
+            .unwrap_or(false);
+    let builtin_port = std::env::var("AUTO_SYNC_PORT")
+        .ok()
+        .filter(|p| p.chars().all(|c| c.is_ascii_digit()) && !p.is_empty())
+        .unwrap_or_else(|| "18080".to_string());
+    let effective_worker_url = if !explicit_worker_url.is_empty() {
+        Some(explicit_worker_url.to_string())
+    } else if has_builtin_sidecar {
+        Some(format!("http://127.0.0.1:{builtin_port}"))
+    } else {
+        None
+    };
+
+    let worker_sync = if let Some(worker_url) = effective_worker_url {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(45))
             .build()
@@ -1615,7 +1636,7 @@ pub async fn sync_all_partner_sources(
             matched: 0,
             synced: 0,
             failed: 0,
-            message: "Worker Bot đối tác: chưa điền URL Worker Render".to_string(),
+            message: "Bot đối tác: chưa thêm 4 biến TG_API_ID / TG_API_HASH / TG_STRING_SESSION / PARTNER_BOT_USERNAMES trên Render".to_string(),
         }
     };
 

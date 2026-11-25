@@ -189,6 +189,7 @@ def _build_http_response(status: int, reason: str, payload: dict[str, Any]) -> b
 
 
 async def start_control_server(
+    host: str,
     port: int,
     admin_api_key: str,
     targets: list[str],
@@ -196,7 +197,7 @@ async def start_control_server(
     client_holder: dict[str, Any],
     sync_lock: asyncio.Lock,
 ) -> asyncio.AbstractServer:
-    """HTTP health & on-demand `/sync` endpoint for Render Free Web Service + Admin Panel."""
+    """HTTP health & on-demand `/sync` endpoint for single-container sidecar or Render Web Service."""
 
     async def handle_client(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
@@ -302,9 +303,23 @@ async def start_control_server(
             except Exception:
                 pass
 
-    server = await asyncio.start_server(handle_client, "0.0.0.0", port)
-    log.info("Control & Health HTTP server listening on 0.0.0.0:%d (GET /health, POST /sync)", port)
+    server = await asyncio.start_server(handle_client, host, port)
+    log.info("Control & Health HTTP server listening on %s:%d (GET /health, POST /sync)", host, port)
     return server
+
+
+def wait_for_shop_ready(shop_base_url: str, max_wait_secs: int = 30) -> None:
+    """Wait briefly until the co-located Rust Axum server finishes booting & running migrations."""
+    health_url = f"{shop_base_url.rstrip('/')}/api/v1/health"
+    deadline = time.monotonic() + max_wait_secs
+    while time.monotonic() < deadline:
+        try:
+            r = requests.get(health_url, timeout=3)
+            if r.status_code == 200:
+                return
+        except Exception:
+            pass
+        time.sleep(1.5)
 
 
 async def main() -> None:
@@ -333,6 +348,7 @@ async def main() -> None:
     session_name = os.getenv("TG_SESSION_PATH", str(Path(__file__).parent / "partner_listener"))
     scan_history_env = int(os.getenv("SCAN_HISTORY_ON_BOOT", "0") or "0")
     scan_count = args.scan_history or scan_history_env
+    auto_sync_port_raw = os.getenv("AUTO_SYNC_PORT", "").strip()
     port_raw = os.getenv("PORT", "").strip()
 
     if not api_id_raw or not api_hash or not partners_raw or not admin_api_key:
@@ -347,9 +363,25 @@ async def main() -> None:
     sync_lock = asyncio.Lock()
     config_cache = SyncConfigCache(shop_base_url, admin_api_key, ttl_secs=15.0)
 
-    if port_raw.isdigit():
+    if auto_sync_port_raw.isdigit():
         await start_control_server(
-            int(port_raw), admin_api_key, targets, shop_base_url, client_holder, sync_lock
+            "127.0.0.1",
+            int(auto_sync_port_raw),
+            admin_api_key,
+            targets,
+            shop_base_url,
+            client_holder,
+            sync_lock,
+        )
+    elif port_raw.isdigit():
+        await start_control_server(
+            "0.0.0.0",
+            int(port_raw),
+            admin_api_key,
+            targets,
+            shop_base_url,
+            client_holder,
+            sync_lock,
         )
 
     if string_session:
@@ -368,6 +400,7 @@ async def main() -> None:
     log.info("Đang theo dõi tự động 24/7 các bot/kênh: %s", ", ".join(targets))
 
     if scan_count > 0:
+        await asyncio.to_thread(wait_for_shop_ready, shop_base_url, 30)
         log.info("Đang quét %d tin nhắn gần nhất để nhập sản phẩm hiện có...", scan_count)
         async with sync_lock:
             res = await scan_targets_history(

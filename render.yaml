@@ -55,3 +55,13 @@ services:
         sync: false
       - key: PAYOS_CHECKSUM_KEY
         sync: false
+      - key: TG_API_ID
+        sync: false
+      - key: TG_API_HASH
+        sync: false
+      - key: TG_STRING_SESSION
+        sync: false
+      - key: PARTNER_BOT_USERNAMES
+        sync: false
+      - key: SCAN_HISTORY_ON_BOOT
+        value: "30"
