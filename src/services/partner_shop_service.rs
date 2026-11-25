@@ -316,11 +316,17 @@ pub async fn sync_partner_products(
         let cat_emoji = ext.category.as_ref().and_then(|c| c.emoji.as_deref());
         let cat_sort = ext.category.as_ref().and_then(|c| c.sort).unwrap_or(0);
 
+        let clean_name = messages::sanitize_telegram_handles(&ext.name, &settings.support_handle);
+        let clean_desc = messages::sanitize_telegram_handles(
+            ext.description.as_deref().unwrap_or(""),
+            &settings.support_handle,
+        );
+
         let updated = partner_repo::upsert_synced_product(
             &state.pool,
             ext.id,
-            &ext.name,
-            ext.description.as_deref().unwrap_or(""),
+            &clean_name,
+            &clean_desc,
             ext.product_type.as_deref().unwrap_or("account"),
             ext.emoji.as_deref().unwrap_or(""),
             ext.image_url.as_deref(),
@@ -994,7 +1000,12 @@ pub async fn ingest_partner_alert_message(
     let settings = settings_repo::get_settings(&state.pool).await?;
     let markup_vnd = settings.partner_shop_markup_vnd.max(0);
     let sell_price_vnd = parsed.partner_price_vnd.saturating_add(markup_vnd);
-    let code = deterministic_auto_plan_code(&parsed.product_name);
+    let clean_name = messages::sanitize_telegram_handles(&parsed.product_name, &settings.support_handle);
+    let clean_desc_opt = parsed
+        .description
+        .as_deref()
+        .map(|d| messages::sanitize_telegram_handles(d, &settings.support_handle));
+    let code = deterministic_auto_plan_code(&clean_name);
 
     let existing: Option<GeminiPlan> =
         sqlx::query_as("SELECT * FROM gemini_plans WHERE code = $1")
@@ -1004,7 +1015,7 @@ pub async fn ingest_partner_alert_message(
 
     let (plan, created, old_price, old_stock) = match existing {
         None => {
-            let desc = parsed.description.clone().unwrap_or_else(|| {
+            let desc = clean_desc_opt.clone().unwrap_or_else(|| {
                 format!(
                     "• Sản phẩm xử lý nhanh, hỗ trợ tận tình.\n• Liên hệ hỗ trợ: {}",
                     settings.support_handle
@@ -1013,7 +1024,7 @@ pub async fn ingest_partner_alert_message(
             let inserted = plan_repo::create_plan(
                 &state.pool,
                 &code,
-                &parsed.product_name,
+                &clean_name,
                 1,
                 sell_price_vnd,
                 parsed.current_stock,
@@ -1030,12 +1041,12 @@ pub async fn ingest_partner_alert_message(
             let updated = plan_repo::update_plan_full(
                 &state.pool,
                 prev.id,
-                Some(&parsed.product_name),
+                Some(&clean_name),
                 None,
                 Some(sell_price_vnd),
                 Some(parsed.current_stock),
                 None,
-                parsed.description.as_deref(),
+                clean_desc_opt.as_deref(),
                 None,
                 None,
                 None,

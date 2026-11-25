@@ -476,7 +476,7 @@
         <div class="hero-badges">
           <span class="hero-badge"><i class="bx bx-shield-quarter"></i> Mã hóa AES-256-GCM</span>
           <span class="hero-badge"><i class="bx bx-qr-scan"></i> VietQR tự động 24/7</span>
-          <span class="hero-badge"><i class="bx bx-support"></i> Hỗ trợ: <span id="heroSupport">@kim12ad</span></span>
+          <span class="hero-badge"><i class="bx bx-support"></i> Hỗ trợ: <span id="heroSupport"><a href="https://t.me/kim12ad" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">@kim12ad</a></span></span>
         </div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -877,6 +877,24 @@
       }
     }
 
+    function normalizeSupportUser(handle) {
+      const clean = String(handle || "@kim12ad").trim().replace(/^https?:\/\/t\.me\//i, "").replace(/^@+/, "").replace(/[^A-Za-z0-9_].*$/, "");
+      return clean || "kim12ad";
+    }
+
+    function linkifySupportHtml(rawText, supportHandle) {
+      const uname = normalizeSupportUser(supportHandle);
+      const url = `https://t.me/${uname}`;
+      const at = `@${uname}`;
+      const linkHtml = `<a href="${url}" target="_blank" rel="noopener" style="color:#60a5fa;font-weight:600;text-decoration:underline;">${at}</a>`;
+      const escaped = esc(rawText);
+      const token = "__TG_SUPPORT_LINK_TOKEN__";
+      return escaped
+        .replace(new RegExp(`https?:\\/\\/t\\.me\\/${uname}`, "gi"), token)
+        .replace(new RegExp(`@${uname}`, "gi"), token)
+        .replaceAll(token, linkHtml);
+    }
+
     async function loadCatalog() {
       const json = await webApi("/api/v1/web/catalog");
       if (!json.success) return;
@@ -884,8 +902,14 @@
       catalogPartnerProducts = json.data.partner_products || [];
       storeSettings = json.data.settings;
 
+      const supportHandle = (storeSettings && storeSettings.support_handle) || "@kim12ad";
+      const supportUser = normalizeSupportUser(supportHandle);
+
       if (storeSettings) {
-        document.getElementById("heroSupport").textContent = storeSettings.support_handle;
+        const heroEl = document.getElementById("heroSupport");
+        if (heroEl) {
+          heroEl.innerHTML = `<a href="https://t.me/${supportUser}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">@${supportUser}</a>`;
+        }
         document.getElementById("minDepositTxt").textContent = fmtVnd(storeSettings.min_deposit_vnd);
         document.getElementById("depositAmountInput").min = storeSettings.min_deposit_vnd;
         document.getElementById("quickAmountsGrid").innerHTML = (storeSettings.quick_deposit_amounts || [])
@@ -924,7 +948,7 @@
                 <span><i class="bx bx-package"></i> Kho: <strong>${p.available_stock}</strong></span>
                 <span><i class="bx bx-cart-alt"></i> Đã bán: <strong>${p.sold_count}</strong></span>
               </div>
-              <div class="plan-desc">${esc(p.description_note)}</div>
+              <div class="plan-desc">${linkifySupportHtml(p.description_note, supportHandle)}</div>
             </div>
             <button class="btn ${p.is_maintenance ? 'btn-ghost' : 'btn-primary'}" style="width:100%;" onclick="clickBuyPlan('${p.id}')" ${!p.is_maintenance && p.available_stock <= 0 ? 'disabled' : ''}>
               ${btnLabel}
@@ -957,7 +981,7 @@
                 <span><i class="bx bx-package"></i> Kho: <strong>${p.stock}</strong></span>
                 <span><i class="bx bx-cart-alt"></i> Đã bán: <strong>${p.sold_count}</strong></span>
               </div>
-              <div class="plan-desc">${esc(p.description || "Giao sản phẩm tự động ngay lập tức sau khi thanh toán.")}</div>
+              <div class="plan-desc">${linkifySupportHtml(p.description || "Giao sản phẩm tự động ngay lập tức sau khi thanh toán.", supportHandle)}</div>
             </div>
             <button class="btn ${p.is_maintenance ? 'btn-ghost' : 'btn-primary'}" style="width:100%;" onclick="clickBuyPartnerProduct('${p.id}')" ${!p.is_maintenance && p.stock <= 0 ? 'disabled' : ''}>
               ${btnLabel}

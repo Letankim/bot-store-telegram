@@ -141,14 +141,38 @@ pub async fn get_catalog(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
 ) -> Result<ApiResponse<WebCatalogRes>, AppError> {
-    let plans = plan_repo::list_active_plans(&state.pool).await?;
+    let s = settings_repo::get_settings(&state.pool).await?;
+    let plans: Vec<GeminiPlan> = plan_repo::list_active_plans(&state.pool)
+        .await?
+        .into_iter()
+        .map(|mut p| {
+            p.name = crate::bot::messages::sanitize_telegram_handles(&p.name, &s.support_handle);
+            p.description_note = crate::bot::messages::sanitize_telegram_handles(
+                &p.description_note,
+                &s.support_handle,
+            );
+            p.maintenance_note = crate::bot::messages::sanitize_telegram_handles(
+                &p.maintenance_note,
+                &s.support_handle,
+            );
+            p
+        })
+        .collect();
     let partner_products: Vec<PublicPartnerProduct> = partner_repo::list_active_products(&state.pool)
         .await
         .unwrap_or_default()
         .into_iter()
-        .map(PublicPartnerProduct::from)
+        .map(|mut p| {
+            p.name = crate::bot::messages::sanitize_telegram_handles(&p.name, &s.support_handle);
+            p.description =
+                crate::bot::messages::sanitize_telegram_handles(&p.description, &s.support_handle);
+            p.maintenance_note = crate::bot::messages::sanitize_telegram_handles(
+                &p.maintenance_note,
+                &s.support_handle,
+            );
+            PublicPartnerProduct::from(p)
+        })
         .collect();
-    let s = settings_repo::get_settings(&state.pool).await?;
 
     let public_settings = PublicStoreSettings {
         support_handle: s.support_handle.clone(),

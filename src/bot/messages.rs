@@ -10,6 +10,168 @@ pub fn escape_html(input: &str) -> String {
         .replace('>', "&gt;")
 }
 
+/// Extract clean Telegram username without leading `@` or URL prefix (default: `kim12ad`).
+pub fn normalize_support_username(support_handle: &str) -> String {
+    let trimmed = support_handle.trim();
+    let without_url = trimmed
+        .strip_prefix("https://t.me/")
+        .or_else(|| trimmed.strip_prefix("http://t.me/"))
+        .or_else(|| trimmed.strip_prefix("t.me/"))
+        .unwrap_or(trimmed);
+    let clean: String = without_url
+        .trim_start_matches('@')
+        .chars()
+        .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
+        .collect();
+    if clean.is_empty() {
+        "kim12ad".to_string()
+    } else {
+        clean
+    }
+}
+
+/// Render clickable HTML Telegram support link: `<a href="https://t.me/kim12ad">@kim12ad</a>`.
+pub fn render_support_link_html(support_handle: &str) -> String {
+    let uname = normalize_support_username(support_handle);
+    format!("<a href=\"https://t.me/{uname}\">@{uname}</a>")
+}
+
+/// Replace ALL external Telegram links (`t.me/...`, `telegram.me/...`, `telegram.dog/...`)
+/// and standalone Telegram `@username` mentions with the shop's own support handle
+/// (default `@kim12ad` / `https://t.me/kim12ad`), while preserving real email addresses
+/// (like `customer@gmail.com`) and email domains (`@gmail.com`).
+pub fn sanitize_telegram_handles(input: &str, support_handle: &str) -> String {
+    let target_uname = normalize_support_username(support_handle);
+    let target_at = format!("@{target_uname}");
+    let target_url = format!("https://t.me/{target_uname}");
+
+    // Pass 1: Replace Telegram URLs (https://t.me/..., http://t.me/..., t.me/..., telegram.me/..., telegram.dog/...)
+    let mut pass1 = String::with_capacity(input.len());
+    let lower = input.to_ascii_lowercase();
+    let bytes = input.as_bytes();
+    let mut i = 0usize;
+    let url_prefixes = [
+        "https://t.me/",
+        "http://t.me/",
+        "https://www.t.me/",
+        "http://www.t.me/",
+        "https://telegram.me/",
+        "http://telegram.me/",
+        "https://telegram.dog/",
+        "http://telegram.dog/",
+        "t.me/",
+        "telegram.me/",
+        "telegram.dog/",
+    ];
+
+    while i < input.len() {
+        let mut matched_prefix_len: Option<usize> = None;
+        let rest_lower = &lower[i..];
+        for pref in url_prefixes {
+            if rest_lower.starts_with(pref) {
+                // For bare domain (`t.me/`, `telegram.me/`, `telegram.dog/`), ensure not part of a longer hostname
+                let is_bare = !pref.starts_with("http");
+                let prev_ok = if !is_bare || i == 0 {
+                    true
+                } else {
+                    let prev = bytes[i - 1];
+                    !(prev.is_ascii_alphanumeric() || prev == b'.' || prev == b'-' || prev == b'_')
+                };
+                if prev_ok {
+                    matched_prefix_len = Some(pref.len());
+                    break;
+                }
+            }
+        }
+
+        if let Some(plen) = matched_prefix_len {
+            let mut end = i + plen;
+            while end < input.len() {
+                let b = bytes[end];
+                if b.is_ascii_alphanumeric()
+                    || matches!(b, b'_' | b'/' | b'+' | b'-' | b'.' | b'?' | b'=' | b'&' | b'%' | b'~' | b'#')
+                {
+                    end += 1;
+                } else {
+                    break;
+                }
+            }
+            // Trim trailing sentence punctuation
+            while end > i + plen
+                && matches!(
+                    bytes[end - 1],
+                    b'.' | b',' | b')' | b']' | b'!' | b'?' | b':' | b';'
+                )
+            {
+                end -= 1;
+            }
+            pass1.push_str(&target_url);
+            i = end;
+        } else {
+            let ch = input[i..].chars().next().unwrap_or('\0');
+            pass1.push(ch);
+            i += ch.len_utf8();
+        }
+    }
+
+    // Pass 2: Replace standalone `@username` mentions (preserving emails like `user@gmail.com` and `@gmail.com`)
+    let mut out = String::with_capacity(pass1.len());
+    let p_bytes = pass1.as_bytes();
+    let mut j = 0usize;
+    while j < pass1.len() {
+        if p_bytes[j] == b'@' {
+            let prev_is_email_local = j > 0 && {
+                let prev = p_bytes[j - 1];
+                prev.is_ascii_alphanumeric()
+                    || matches!(prev, b'.' | b'_' | b'%' | b'+' | b'-')
+            };
+
+            if !prev_is_email_local && j + 1 < pass1.len() && p_bytes[j + 1].is_ascii_alphabetic() {
+                let mut end = j + 1;
+                while end < pass1.len()
+                    && (p_bytes[end].is_ascii_alphanumeric() || p_bytes[end] == b'_')
+                {
+                    end += 1;
+                }
+                let uname_len = end - (j + 1);
+                // Check if followed by `.<tld>` (e.g. `@gmail.com`, `@icloud.com`) -> email domain, keep as-is
+                let followed_by_tld = end + 2 < pass1.len()
+                    && p_bytes[end] == b'.'
+                    && p_bytes[end + 1].is_ascii_alphabetic()
+                    && p_bytes[end + 2].is_ascii_alphabetic();
+
+                if uname_len >= 3 && !followed_by_tld {
+                    out.push_str(&target_at);
+                    j = end;
+                    continue;
+                }
+            }
+        }
+        let ch = pass1[j..].chars().next().unwrap_or('\0');
+        out.push(ch);
+        j += ch.len_utf8();
+    }
+
+    out
+}
+
+/// Sanitize external Telegram handles/links to our support handle, escape HTML,
+/// and turn `@kim12ad` / `https://t.me/kim12ad` into clickable HTML links `<a href="https://t.me/kim12ad">@kim12ad</a>`.
+pub fn format_safe_telegram_html(input: &str, support_handle: &str) -> String {
+    let sanitized = sanitize_telegram_handles(input, support_handle);
+    let escaped = escape_html(&sanitized);
+    let uname = normalize_support_username(support_handle);
+    let target_url = format!("https://t.me/{uname}");
+    let target_at = format!("@{uname}");
+    let link_html = format!("<a href=\"{target_url}\">{target_at}</a>");
+
+    // Replace URL occurrences first with a placeholder so we don't double-link `@uname` inside the HTML
+    const PLACEHOLDER: &str = "\x1F__TG_SUPPORT_LINK__\x1F";
+    let step1 = escaped.replace(&target_url, PLACEHOLDER);
+    let step2 = step1.replace(&target_at, PLACEHOLDER);
+    step2.replace(PLACEHOLDER, &link_html)
+}
+
 pub fn welcome_message(
     full_name: &str,
     balance_vnd: i64,
@@ -43,7 +205,7 @@ pub fn welcome_message(
         format_vnd(reward_vnd),
         format_vnd(min_first_deposit_vnd),
         friend_bonus_line,
-        escape_html(support_handle),
+        render_support_link_html(support_handle),
     )
 }
 
@@ -135,15 +297,15 @@ pub fn gemini_plan_card(plan: &GeminiPlan, guide_url: &str, support_handle: &str
          ‼️ Vui lòng đọc kỹ tiêu đề sản phẩm &amp; mô tả trước khi mua hàng.\n\
          Chỉ hỗ trợ refund với những đơn hàng lỗi.\n\
          Hỗ trợ: {}",
-        escape_html(&plan.name),
+        format_safe_telegram_html(&plan.name, support_handle),
         maintenance_line,
         form_req_line,
         format_vnd(plan.price_vnd),
         plan.available_stock,
         plan.sold_count,
-        escape_html(&plan.description_note),
+        format_safe_telegram_html(&plan.description_note, support_handle),
         guide_line,
-        escape_html(support_handle)
+        render_support_link_html(support_handle)
     )
 }
 
@@ -271,7 +433,7 @@ pub fn partner_product_card(product: &PartnerProduct, support_handle: &str) -> S
     let desc_block = if product.description.trim().is_empty() {
         "Giao tài khoản / key tự động ngay lập tức sau khi thanh toán.".to_string()
     } else {
-        escape_html(product.description.trim())
+        format_safe_telegram_html(product.description.trim(), support_handle)
     };
     let type_label = if product.product_type.eq_ignore_ascii_case("key") {
         "Key kích hoạt"
@@ -289,11 +451,11 @@ pub fn partner_product_card(product: &PartnerProduct, support_handle: &str) -> S
          {desc_block}</blockquote>\n\n\
          ⚡ Giao hàng tự động ngay lập tức 24/7.\n\
          🛟 Hỗ trợ: {}",
-        escape_html(&product.name),
+        format_safe_telegram_html(&product.name, support_handle),
         format_vnd(product.sell_price_vnd),
         product.stock,
         product.sold_count,
-        escape_html(support_handle),
+        render_support_link_html(support_handle),
     )
 }
 
@@ -310,4 +472,34 @@ pub fn partner_product_maintenance_message(product: &PartnerProduct) -> String {
         escape_html(&product.name),
         escape_html(note),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_telegram_handles_replaces_external_but_keeps_emails() {
+        let raw = "Liên hệ @other_shop hoặc https://t.me/other_admin_bot?start=123 hoặc t.me/partner_grp.\n\
+                   Gửi email customer1@gmail.com (đuôi @gmail.com) về cho @support_cu!";
+        let cleaned = sanitize_telegram_handles(raw, "@kim12ad");
+        assert!(cleaned.contains("Liên hệ @kim12ad"));
+        assert!(cleaned.contains("https://t.me/kim12ad"));
+        assert!(cleaned.contains("customer1@gmail.com"));
+        assert!(cleaned.contains("đuôi @gmail.com"));
+        assert!(cleaned.contains("cho @kim12ad!"));
+        assert!(!cleaned.contains("other_shop"));
+        assert!(!cleaned.contains("other_admin_bot"));
+        assert!(!cleaned.contains("partner_grp"));
+        assert!(!cleaned.contains("support_cu"));
+    }
+
+    #[test]
+    fn test_format_safe_telegram_html_creates_clickable_support_links() {
+        let html = format_safe_telegram_html("Ib @other_admin hoặc t.me/other_channel", "@kim12ad");
+        assert_eq!(
+            html,
+            "Ib <a href=\"https://t.me/kim12ad\">@kim12ad</a> hoặc <a href=\"https://t.me/kim12ad\">@kim12ad</a>"
+        );
+    }
 }
