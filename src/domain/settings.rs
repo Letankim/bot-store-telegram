@@ -22,6 +22,8 @@ pub struct AppSettings {
     pub partner_shop_markup_vnd: i64,
     pub partner_shop_sync_interval_secs: i32,
     pub partner_shop_notify_changes: bool,
+    pub auto_sync_worker_url: String,
+    pub telethon_auto_sync: bool,
     pub updated_at: DateTime<Utc>,
 }
 

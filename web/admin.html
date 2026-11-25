@@ -435,6 +435,103 @@
       transition: background 0.15s;
     }
     .item-row:hover { background: var(--card-hover); }
+
+    /* Compact Data Table */
+    .table-toolbar {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .sync-strip {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 11px 14px;
+      border-radius: 11px;
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.24);
+      margin-bottom: 14px;
+      font-size: 0.82rem;
+    }
+    .sync-strip-items {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .data-table-wrap {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(9, 14, 26, 0.45);
+    }
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      text-align: left;
+    }
+    .data-table thead th {
+      background: rgba(22, 31, 51, 0.92);
+      color: var(--muted);
+      font-weight: 700;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    .data-table tbody td {
+      padding: 12px 14px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+      vertical-align: middle;
+    }
+    .data-table tbody tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover { background: rgba(59, 130, 246, 0.07); }
+    .td-title { font-weight: 700; color: var(--text); line-height: 1.35; }
+    .td-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      margin-top: 2px;
+    }
+    .td-actions { display: flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; }
+    .btn-sm { padding: 6px 10px; font-size: 0.78rem; border-radius: 8px; gap: 5px; }
+    .btn-sm i { font-size: 0.98rem; }
+    .modal-box-lg { max-width: 780px; }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .detail-item {
+      background: rgba(9, 14, 26, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .detail-item span { display: block; font-size: 0.74rem; color: var(--muted); margin-bottom: 3px; }
+    .detail-item strong { font-size: 0.88rem; color: var(--text); word-break: break-word; }
+    .detail-desc {
+      background: rgba(9, 14, 26, 0.65);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      font-size: 0.84rem;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      line-height: 1.55;
+      max-height: 220px;
+      overflow-y: auto;
+    }
     .steps { padding-left: 18px; font-size: 0.84rem; color: var(--muted); }
     .steps li { margin-bottom: 6px; }
     .steps strong { color: var(--text); }
@@ -496,10 +593,10 @@
       <i class="bx bx-group"></i> Người dùng &amp; ví
     </button>
     <button class="nav-btn" onclick="switchPane('plans', this)">
-      <i class="bx bx-package"></i> Sản phẩm &amp; ví
+      <i class="bx bx-package"></i> Sản phẩm
     </button>
     <button class="nav-btn" onclick="switchPane('partner-shop', this)">
-      <i class="bx bx-shopping-bag"></i> Shop đối tác (API)
+      <i class="bx bx-sync"></i> Đồng bộ &amp; Đối tác
     </button>
     <button class="nav-btn" onclick="switchPane('bot', this)">
       <i class="bx bx-qr-scan"></i> Kết nối Bot &amp; QR
@@ -791,80 +888,52 @@
         </div>
       </section>
 
-      <!-- PANE 3: PLANS & WALLET -->
+      <!-- PANE 3: PRODUCTS & WALLET -->
       <section id="pane-plans" class="pane">
         <div class="card">
           <div class="card-head">
-            <div class="card-title"><i class="bx bx-package"></i> Quản lý gói kích hoạt Gemini Pro</div>
+            <div class="card-title"><i class="bx bx-package"></i> Quản lý danh sách sản phẩm</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
-              <button class="btn btn-ok" onclick="toggleNewPlanBox()"><i class="bx bx-plus"></i> Thêm gói mới</button>
-              <button class="btn btn-ghost" onclick="loadPlans()"><i class="bx bx-refresh"></i> Tải lại</button>
+              <button id="plansSyncBtn" class="btn btn-primary" onclick="syncAllSourcesNow(this)">
+                <i class="bx bx-sync"></i> Đồng bộ ngay
+              </button>
+              <button class="btn btn-ghost" onclick="openSyncConfigModal()">
+                <i class="bx bx-cog"></i> Cấu hình Sync
+              </button>
+              <button class="btn btn-ok" onclick="openNewPlanModal()">
+                <i class="bx bx-plus"></i> Thêm sản phẩm
+              </button>
+              <button class="btn btn-ghost" onclick="loadPlans()">
+                <i class="bx bx-refresh"></i> Tải lại
+              </button>
             </div>
           </div>
 
-          <div id="newPlanBox" class="item-row" style="display:none;border-color:rgba(16,185,129,0.45);margin-bottom:16px;">
-            <div style="font-weight:700;margin-bottom:12px;color:#34d399;display:flex;align-items:center;gap:6px;">
-              <i class="bx bx-plus-circle"></i> Tạo gói kích hoạt Gemini Pro mới
+          <div class="sync-strip">
+            <div class="sync-strip-items">
+              <span><i class="bx bx-bot" style="color:#60a5fa;"></i> Auto-Sync Bot đối tác: <strong id="stripTelethonStatus">--</strong></span>
+              <span><i class="bx bx-plug" style="color:#34d399;"></i> Auto-Sync API: <strong id="stripApiStatus">--</strong></span>
+              <span><i class="bx bx-trending-up" style="color:#fbbf24;"></i> Mức lời mặc định: <strong id="stripMarkup">--</strong></span>
             </div>
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Mã gói (viết liền không dấu)</label>
-                <input id="newPlanCode" type="text" placeholder="VD: GEMINI_PRO_12M" />
-              </div>
-              <div class="form-group">
-                <label>Tên gói hiển thị trên Bot</label>
-                <input id="newPlanName" type="text" placeholder="VD: Gemini Pro Your Mail 12 tháng" />
-              </div>
-              <div class="form-group">
-                <label>Thời hạn (tháng)</label>
-                <input id="newPlanMonths" type="number" value="3" min="1" />
-              </div>
-              <div class="form-group">
-                <label>Giá bán (VND)</label>
-                <input id="newPlanPrice" type="number" value="40000" min="1000" step="1000" />
-              </div>
-              <div class="form-group">
-                <label>Tồn kho ban đầu</label>
-                <input id="newPlanStock" type="number" value="100" min="0" />
-              </div>
-              <div class="form-group">
-                <label>Thứ tự hiển thị</label>
-                <input id="newPlanOrder" type="number" value="3" />
-              </div>
-              <div class="form-group">
-                <label>Loại xử lý API</label>
-                <select id="newPlanApiMode" style="width:100%;">
-                  <option value="autopay">Auto pay (autopay — kích hoạt tự động)</option>
-                  <option value="extract">Tự pay (extract — trích xuất link ưu đãi)</option>
-                  <option value="payadd">Payadd (thêm phương thức thanh toán)</option>
-                  <option value="manual">Xử lý thủ công (Admin tự xử lý — không đẩy API)</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Yêu cầu form khi khách mua</label>
-                <select id="newPlanFormMode" style="width:100%;" onchange="onNewPlanFormModeChange(this.value)">
-                  <option value="mail_pass_2fa">Form đầy đủ: Email | Mật khẩu | 2FA (+ Backup Codes)</option>
-                  <option value="email_only">Chỉ cần nhập Email (VD: mời Family, Canva, ChatGPT...)</option>
-                  <option value="custom_note">Nhập 1 ô thông tin tùy chỉnh (Username / Link / Ghi chú)</option>
-                  <option value="none">Không cần điền form (bấm mua &amp; thanh toán ngay)</option>
-                </select>
-              </div>
-              <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Nhãn hướng dẫn ô nhập (tùy chọn — dùng khi chọn Chỉ Email hoặc Tùy chỉnh)</label>
-                <input id="newPlanCustomLabel" type="text" placeholder="VD: Nhập địa chỉ Email nhận lời mời Family / Canva Pro..." />
-              </div>
-              <div class="form-group" style="grid-column: 1 / -1;">
-                <label>Mô tả chi tiết hiển thị trên Bot</label>
-                <textarea id="newPlanDesc" rows="4" placeholder="• Khách hàng cần cung cấp Mail|Pass|2FA (bắt buộc)...&#10;• Hỗ trợ hoàn tiền 100% với đơn hàng lỗi..."></textarea>
-              </div>
-            </div>
-            <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end;">
-              <button class="btn btn-ghost" onclick="toggleNewPlanBox()">Hủy</button>
-              <button class="btn btn-ok" onclick="createNewPlan()"><i class="bx bx-check"></i> Tạo gói ngay</button>
-            </div>
+            <button class="btn btn-ghost btn-sm" onclick="openSyncConfigModal()">
+              <i class="bx bx-slider"></i> Bật / Tắt &amp; Cài đặt
+            </button>
           </div>
 
-          <div id="plansList" style="font-size:0.88rem;color:var(--muted);">Nhập ADMIN_API_KEY để quản lý gói.</div>
+          <div class="table-toolbar">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;flex:1;min-width:220px;">
+              <input id="planSearchInput" type="text" placeholder="Tìm theo tên hoặc mã sản phẩm..." style="min-width:240px;flex:1;max-width:360px;" oninput="renderPlansTable()" />
+              <select id="planStatusFilter" onchange="renderPlansTable()">
+                <option value="">Tất cả trạng thái</option>
+                <option value="active">Đang mở bán</option>
+                <option value="maintenance">Đang bảo trì</option>
+                <option value="hidden">Đang tạm ẩn</option>
+              </select>
+            </div>
+            <div id="plansCountLabel" style="font-size:0.82rem;color:var(--muted);">-- sản phẩm</div>
+          </div>
+
+          <div id="plansList" style="font-size:0.88rem;color:var(--muted);">Đang tải danh sách sản phẩm...</div>
         </div>
 
         <div class="card">
@@ -893,43 +962,35 @@
         </div>
       </section>
 
-      <!-- PANE 3.5: PARTNER SHOP API (telebot.aidesign.io.vn) -->
+      <!-- PANE 3.5: PARTNER SHOP API & AUTO-SYNC -->
       <section id="pane-partner-shop" class="pane">
         <div class="card">
           <div class="card-head">
-            <div class="card-title"><i class="bx bx-shopping-bag"></i> Cấu hình API Shop đối tác (đồng bộ sản phẩm, giá &amp; tồn kho)</div>
+            <div class="card-title"><i class="bx bx-sync"></i> Cấu hình Đồng bộ tự động &amp; Shop đối tác</div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;">
               <button class="btn btn-ghost" onclick="loadPartnerShopBalance(true)"><i class="bx bx-wallet"></i> Kiểm tra số dư</button>
-              <button id="psSyncBtn" class="btn btn-primary" onclick="syncPartnerShopNow()"><i class="bx bx-sync"></i> Đồng bộ sản phẩm ngay</button>
+              <button id="psSyncBtn" class="btn btn-primary" onclick="syncAllSourcesNow(this)"><i class="bx bx-sync"></i> Đồng bộ ngay (API + Bot)</button>
             </div>
           </div>
 
           <div class="form-grid">
             <div class="form-group">
-              <label><i class="bx bx-globe"></i> Base URL Shop đối tác</label>
-              <input id="psBaseUrl" type="text" placeholder="https://telebot.aidesign.io.vn/api/partner-api" />
+              <label><i class="bx bx-bot"></i> Tự động đồng bộ từ Bot đối tác (Telethon 24/7)</label>
+              <select id="psTelethonAuto" style="width:100%;">
+                <option value="true">Bật (tự nghe thông báo mới &amp; cập nhật giá/kho ngay)</option>
+                <option value="false">Tắt (tạm dừng auto-sync — chỉ đồng bộ khi bấm nút)</option>
+              </select>
+              <div class="form-hint">Worker Python sẽ tự cập nhật trạng thái Bật/Tắt trong vòng 15 giây mà không cần deploy lại.</div>
             </div>
             <div class="form-group">
-              <label><i class="bx bx-key"></i> API Key (X-API-Key)</label>
-              <input id="psApiKey" type="password" placeholder="Nhập API Key đối tác..." />
-              <div class="form-hint">Lưu bảo mật trong PostgreSQL, tuyệt đối không lộ ra phía khách hàng.</div>
+              <label><i class="bx bx-link"></i> URL Worker Auto-Sync (Render Web Service)</label>
+              <input id="psWorkerUrl" type="text" placeholder="https://bot-store-auto-sync.onrender.com" />
+              <div class="form-hint">Điền URL dịch vụ <code>bot-store-auto-sync</code> trên Render để nút <strong>Đồng bộ ngay</strong> kích hoạt quét lịch sử Bot đối tác.</div>
             </div>
             <div class="form-group">
               <label><i class="bx bx-trending-up"></i> Giá chênh lệch / lời mặc định mỗi sản phẩm (VND)</label>
               <input id="psMarkupVnd" type="number" min="0" step="1000" value="30000" />
-              <div class="form-hint">Mặc định <strong>+30.000 đ</strong>. Khi đối tác tăng/giảm giá, giá bán cho khách sẽ tự động cập nhật = <code>giá gốc + lời</code>.</div>
-            </div>
-            <div class="form-group">
-              <label><i class="bx bx-time-five"></i> Chu kỳ tự động đồng bộ (giây)</label>
-              <input id="psSyncInterval" type="number" min="30" step="30" value="180" />
-              <div class="form-hint">Mặc định 180 giây (3 phút/lần), tối thiểu 30 giây.</div>
-            </div>
-            <div class="form-group">
-              <label><i class="bx bx-power-off"></i> Tự động đồng bộ định kỳ</label>
-              <select id="psEnabled" style="width:100%;">
-                <option value="true">Bật (tự động gọi API cập nhật giá &amp; tồn kho)</option>
-                <option value="false">Tắt (chỉ đồng bộ khi Admin bấm nút)</option>
-              </select>
+              <div class="form-hint">Mặc định <strong>+30.000 đ</strong>. Áp dụng cho cả Bot đối tác &amp; API đối tác — khách chỉ thấy giá bán cuối cùng.</div>
             </div>
             <div class="form-group">
               <label><i class="bx bx-bell"></i> Tự thông báo khách khi đổi giá / lên kho</label>
@@ -937,6 +998,27 @@
                 <option value="true">Bật (tự gửi Telegram báo giảm giá / lên kho cho khách)</option>
                 <option value="false">Tắt (chỉ cập nhật giá &amp; kho âm thầm)</option>
               </select>
+            </div>
+            <div class="form-group">
+              <label><i class="bx bx-globe"></i> Base URL API Shop đối tác</label>
+              <input id="psBaseUrl" type="text" placeholder="https://telebot.aidesign.io.vn/api/partner-api" />
+            </div>
+            <div class="form-group">
+              <label><i class="bx bx-key"></i> API Key đối tác (X-API-Key)</label>
+              <input id="psApiKey" type="password" placeholder="Nhập API Key đối tác..." />
+              <div class="form-hint">Lưu bảo mật trong PostgreSQL, tuyệt đối không lộ ra phía khách hàng.</div>
+            </div>
+            <div class="form-group">
+              <label><i class="bx bx-power-off"></i> Tự động đồng bộ API định kỳ</label>
+              <select id="psEnabled" style="width:100%;">
+                <option value="true">Bật (tự động gọi API cập nhật giá &amp; tồn kho)</option>
+                <option value="false">Tắt (chỉ đồng bộ API khi Admin bấm nút)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label><i class="bx bx-time-five"></i> Chu kỳ tự động đồng bộ API (giây)</label>
+              <input id="psSyncInterval" type="number" min="30" step="30" value="180" />
+              <div class="form-hint">Mặc định 180 giây (3 phút/lần), tối thiểu 30 giây.</div>
             </div>
           </div>
 
@@ -951,10 +1033,10 @@
 
         <div class="card">
           <div class="card-head">
-            <div class="card-title"><i class="bx bx-grid-alt"></i> Danh sách sản phẩm đồng bộ từ Shop đối tác</div>
+            <div class="card-title"><i class="bx bx-grid-alt"></i> Danh sách sản phẩm đồng bộ từ API Shop đối tác</div>
             <button class="btn btn-ghost" onclick="loadPartnerShopProducts()"><i class="bx bx-refresh"></i> Tải lại</button>
           </div>
-          <div id="psProductsList" style="font-size:0.88rem;color:var(--muted);">Chưa có sản phẩm nào được đồng bộ. Hãy điền API Key rồi bấm "Đồng bộ sản phẩm ngay".</div>
+          <div id="psProductsList" style="font-size:0.88rem;color:var(--muted);">Chưa có sản phẩm nào được đồng bộ qua API.</div>
         </div>
 
         <div class="card">
@@ -1097,6 +1179,290 @@
     </div>
   </div>
 
+  <!-- PRODUCT DETAIL MODAL -->
+  <div id="planDetailModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('planDetailModal')">
+    <div class="modal-box modal-box-lg">
+      <div class="card-head" style="margin-bottom:14px;">
+        <div class="card-title"><i class="bx bx-package"></i> <span id="pdTitle">Chi tiết sản phẩm</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('planDetailModal')"><i class="bx bx-x"></i> Đóng</button>
+      </div>
+      <div id="pdBody"></div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeModal('planDetailModal')">Đóng</button>
+        <button id="pdEditBtn" class="btn btn-primary" onclick="switchDetailToEdit()"><i class="bx bx-edit-alt"></i> Chỉnh sửa sản phẩm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT PRODUCT MODAL -->
+  <div id="editPlanModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('editPlanModal')">
+    <div class="modal-box modal-box-lg">
+      <div class="card-head" style="margin-bottom:14px;">
+        <div class="card-title"><i class="bx bx-edit-alt"></i> <span id="epTitle">Chỉnh sửa sản phẩm</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('editPlanModal')"><i class="bx bx-x"></i> Đóng</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Tên sản phẩm hiển thị trên Bot &amp; Web</label>
+          <input id="epName" type="text" />
+        </div>
+        <div class="form-group">
+          <label>Giá bán (VND)</label>
+          <input id="epPrice" type="number" min="1000" step="1000" />
+        </div>
+        <div class="form-group">
+          <label>Tồn kho</label>
+          <input id="epStock" type="number" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Đã bán</label>
+          <input id="epSold" type="number" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Thời hạn (tháng)</label>
+          <input id="epMonths" type="number" min="1" />
+        </div>
+        <div class="form-group">
+          <label>Thứ tự hiển thị</label>
+          <input id="epOrder" type="number" />
+        </div>
+        <div class="form-group">
+          <label>Loại xử lý API</label>
+          <select id="epApiMode" style="width:100%;">
+            <option value="autopay">Auto pay (autopay — kích hoạt tự động)</option>
+            <option value="extract">Tự pay (extract — trích xuất link ưu đãi)</option>
+            <option value="payadd">Payadd (thêm phương thức thanh toán)</option>
+            <option value="manual">Xử lý thủ công (không đẩy API)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Yêu cầu form khi khách mua</label>
+          <select id="epFormMode" style="width:100%;">
+            <option value="mail_pass_2fa">Form đầy đủ: Email | Mật khẩu | 2FA</option>
+            <option value="email_only">Chỉ cần nhập Email</option>
+            <option value="custom_note">Nhập 1 ô thông tin tùy chỉnh</option>
+            <option value="none">Không cần điền form (mua ngay)</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Nhãn hướng dẫn ô nhập (tùy chọn — cho chế độ Chỉ Email / Tùy chỉnh)</label>
+          <input id="epCustomLabel" type="text" placeholder="VD: Nhập địa chỉ Email nhận lời mời Family / Canva Pro..." />
+        </div>
+        <div class="form-group">
+          <label>Trạng thái hiển thị</label>
+          <select id="epActive" style="width:100%;">
+            <option value="true">Đang mở bán</option>
+            <option value="false">Tạm ẩn khỏi Bot &amp; Web</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Chế độ bảo trì sản phẩm</label>
+          <select id="epMaint" style="width:100%;">
+            <option value="false">Hoạt động bình thường (cho phép mua)</option>
+            <option value="true">Đang bảo trì (vẫn hiện, bấm mua báo bảo trì)</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Nội dung thông báo khi khách bấm mua lúc bảo trì</label>
+          <input id="epMaintNote" type="text" placeholder="Vui lòng thử lại sau." />
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Mô tả chi tiết hiển thị trên Telegram &amp; Web</label>
+          <textarea id="epDesc" rows="5"></textarea>
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
+        <label style="display:flex;align-items:center;gap:7px;font-size:0.82rem;color:var(--muted);cursor:pointer;">
+          <input id="epNotifyRestock" type="checkbox" checked style="width:16px;height:16px;accent-color:#3b82f6;" />
+          <span>Gửi thông báo "Hàng mới vừa lên kho" tới tất cả khách khi tăng tồn kho</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:7px;font-size:0.82rem;color:var(--muted);cursor:pointer;">
+          <input id="epNotifyMaint" type="checkbox" checked style="width:16px;height:16px;accent-color:#f59e0b;" />
+          <span>Gửi thông báo bảo trì / mở bán lại tới tất cả khách khi bật hoặc tắt bảo trì</span>
+        </label>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeModal('editPlanModal')">Hủy</button>
+        <button id="epSaveBtn" class="btn btn-ok" onclick="saveEditPlanModal()"><i class="bx bx-save"></i> Lưu thay đổi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- NEW PRODUCT MODAL -->
+  <div id="newPlanModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('newPlanModal')">
+    <div class="modal-box modal-box-lg">
+      <div class="card-head" style="margin-bottom:14px;">
+        <div class="card-title"><i class="bx bx-plus-circle" style="color:#34d399;"></i> <span>Thêm sản phẩm mới</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('newPlanModal')"><i class="bx bx-x"></i> Đóng</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Mã sản phẩm (viết liền không dấu)</label>
+          <input id="newPlanCode" type="text" placeholder="VD: GEMINI_PRO_12M" />
+        </div>
+        <div class="form-group">
+          <label>Tên sản phẩm hiển thị trên Bot &amp; Web</label>
+          <input id="newPlanName" type="text" placeholder="VD: Google AI Ultra 5x (20 TB)" />
+        </div>
+        <div class="form-group">
+          <label>Thời hạn (tháng)</label>
+          <input id="newPlanMonths" type="number" value="1" min="1" />
+        </div>
+        <div class="form-group">
+          <label>Giá bán (VND)</label>
+          <input id="newPlanPrice" type="number" value="40000" min="1000" step="1000" />
+        </div>
+        <div class="form-group">
+          <label>Tồn kho ban đầu</label>
+          <input id="newPlanStock" type="number" value="50" min="0" />
+        </div>
+        <div class="form-group">
+          <label>Thứ tự hiển thị</label>
+          <input id="newPlanOrder" type="number" value="10" />
+        </div>
+        <div class="form-group">
+          <label>Loại xử lý API</label>
+          <select id="newPlanApiMode" style="width:100%;">
+            <option value="autopay">Auto pay (autopay — kích hoạt tự động)</option>
+            <option value="extract">Tự pay (extract — trích xuất link ưu đãi)</option>
+            <option value="payadd">Payadd (thêm phương thức thanh toán)</option>
+            <option value="manual">Xử lý thủ công (Admin tự xử lý — không đẩy API)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Yêu cầu form khi khách mua</label>
+          <select id="newPlanFormMode" style="width:100%;" onchange="onNewPlanFormModeChange(this.value)">
+            <option value="mail_pass_2fa">Form đầy đủ: Email | Mật khẩu | 2FA (+ Backup Codes)</option>
+            <option value="email_only">Chỉ cần nhập Email (VD: mời Family, Canva, ChatGPT...)</option>
+            <option value="custom_note">Nhập 1 ô thông tin tùy chỉnh (Username / Link / Ghi chú)</option>
+            <option value="none">Không cần điền form (bấm mua &amp; thanh toán ngay)</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Nhãn hướng dẫn ô nhập (tùy chọn — dùng khi chọn Chỉ Email hoặc Tùy chỉnh)</label>
+          <input id="newPlanCustomLabel" type="text" placeholder="VD: Nhập địa chỉ Email nhận lời mời Family / Canva Pro..." />
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Mô tả chi tiết hiển thị trên Bot &amp; Web</label>
+          <textarea id="newPlanDesc" rows="4" placeholder="Nhập mô tả, điều kiện sử dụng và chính sách bảo hành..."></textarea>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeModal('newPlanModal')">Hủy</button>
+        <button class="btn btn-ok" onclick="createNewPlan()"><i class="bx bx-check"></i> Tạo sản phẩm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- QUICK AUTO-SYNC CONFIG MODAL -->
+  <div id="syncConfigModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('syncConfigModal')">
+    <div class="modal-box modal-box-lg">
+      <div class="card-head" style="margin-bottom:14px;">
+        <div class="card-title"><i class="bx bx-sync"></i> <span>Cấu hình Đồng bộ tự động &amp; Đồng bộ ngay</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('syncConfigModal')"><i class="bx bx-x"></i> Đóng</button>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label><i class="bx bx-bot"></i> Tự động sync từ Bot đối tác (24/7)</label>
+          <select id="msTelethonAuto" style="width:100%;">
+            <option value="true">Bật (tự cập nhật ngay khi Bot đối tác báo tin mới)</option>
+            <option value="false">Tắt (chỉ đồng bộ khi Admin bấm nút)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label><i class="bx bx-trending-up"></i> Mức lời cộng thêm mặc định (VND)</label>
+          <input id="msMarkupVnd" type="number" min="0" step="1000" value="30000" />
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label><i class="bx bx-link"></i> URL Worker Auto-Sync trên Render (để bấm Đồng bộ ngay)</label>
+          <input id="msWorkerUrl" type="text" placeholder="https://bot-store-auto-sync.onrender.com" />
+          <div class="form-hint">Dán URL dịch vụ <code>bot-store-auto-sync</code> từ Render Dashboard vào đây.</div>
+        </div>
+        <div class="form-group">
+          <label><i class="bx bx-power-off"></i> Tự động sync API Shop đối tác định kỳ</label>
+          <select id="msApiEnabled" style="width:100%;">
+            <option value="true">Bật (tự gọi API định kỳ)</option>
+            <option value="false">Tắt (chỉ gọi API khi bấm nút)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label><i class="bx bx-time-five"></i> Chu kỳ sync API (giây)</label>
+          <input id="msSyncInterval" type="number" min="30" step="30" value="180" />
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label><i class="bx bx-bell"></i> Tự thông báo khách hàng khi đổi giá / lên kho</label>
+          <select id="msNotifyChanges" style="width:100%;">
+            <option value="true">Bật (tự gửi tin báo giảm giá / lên kho qua Telegram)</option>
+            <option value="false">Tắt (chỉ cập nhật giá &amp; tồn kho âm thầm)</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="syncAllSourcesNow(this)">
+          <i class="bx bx-sync"></i> Đồng bộ ngay bây giờ
+        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" onclick="closeModal('syncConfigModal')">Đóng</button>
+          <button class="btn btn-ok" onclick="saveSyncConfigModal()"><i class="bx bx-save"></i> Lưu cấu hình</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PARTNER PRODUCT DETAIL MODAL -->
+  <div id="partnerProdDetailModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('partnerProdDetailModal')">
+    <div class="modal-box modal-box-lg">
+      <div class="card-head" style="margin-bottom:14px;">
+        <div class="card-title"><i class="bx bx-shopping-bag"></i> <span id="ppdTitle">Chi tiết sản phẩm đối tác</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('partnerProdDetailModal')"><i class="bx bx-x"></i> Đóng</button>
+      </div>
+      <div id="ppdBody"></div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeModal('partnerProdDetailModal')">Đóng</button>
+        <button class="btn btn-primary" onclick="switchPartnerDetailToEdit()"><i class="bx bx-edit-alt"></i> Chỉnh sửa</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EDIT PARTNER PRODUCT MODAL -->
+  <div id="editPartnerProdModal" class="modal-backdrop" onclick="if(event.target===this) closeModal('editPartnerProdModal')">
+    <div class="modal-box" style="max-width:560px;">
+      <div class="card-head" style="margin-bottom:14px;">
+        <div class="card-title"><i class="bx bx-edit-alt"></i> <span id="eppTitle">Sửa sản phẩm đối tác</span></div>
+        <button class="btn btn-ghost btn-sm" onclick="closeModal('editPartnerProdModal')"><i class="bx bx-x"></i> Đóng</button>
+      </div>
+      <div id="eppSummary" style="font-size:0.83rem;color:var(--muted);margin-bottom:12px;"></div>
+      <div class="form-grid">
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Lời riêng sản phẩm này (VND — để trống = dùng mức lời mặc định)</label>
+          <input id="eppCustomMarkup" type="number" min="0" step="1000" placeholder="Để trống = dùng mặc định hệ thống" />
+        </div>
+        <div class="form-group">
+          <label>Hiển thị bán</label>
+          <select id="eppActive" style="width:100%;">
+            <option value="true">Đang mở bán</option>
+            <option value="false">Tạm ẩn khỏi Bot &amp; Web</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Trạng thái bảo trì</label>
+          <select id="eppMaint" style="width:100%;">
+            <option value="false">Hoạt động bình thường</option>
+            <option value="true">Đang bảo trì</option>
+          </select>
+        </div>
+        <div class="form-group" style="grid-column: 1 / -1;">
+          <label>Nội dung thông báo bảo trì</label>
+          <input id="eppMaintNote" type="text" placeholder="Vui lòng thử lại sau." />
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;justify-content:flex-end;">
+        <button class="btn btn-ghost" onclick="closeModal('editPartnerProdModal')">Hủy</button>
+        <button class="btn btn-ok" onclick="saveEditPartnerProdModal()"><i class="bx bx-save"></i> Lưu thay đổi</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast"><i class="bx bx-info-circle"></i> <span id="toastText"></span></div>
 
   <script>
@@ -1106,8 +1472,19 @@
     const BASE_TITLE = "Admin Console — Gemini Pro Store";
     const usersById = {};
     const ordersById = {};
+    const plansById = {};
+    const partnerProdsById = {};
+    let allPlans = [];
+    let latestSettings = null;
+    let activePlanId = null;
+    let activePartnerProdId = null;
     let pendingAdjust = { userId: null, sign: 1 };
     let pendingRefundOrderId = null;
+
+    function closeModal(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.remove("open");
+    }
 
     function translateApiErrorClient(raw) {
       const s = String(raw || "").trim();
@@ -1424,6 +1801,7 @@
           return false;
         }
         const s = json.data;
+        latestSettings = s;
         document.getElementById("cfgSupport").value = s.support_handle;
         document.getElementById("cfgMinDeposit").value = s.min_deposit_vnd;
         document.getElementById("cfgRefReward").value = s.referral_reward_vnd;
@@ -1443,6 +1821,26 @@
           document.getElementById("psSyncInterval").value = s.partner_shop_sync_interval_secs ?? 180;
           document.getElementById("psEnabled").value = String(!!s.partner_shop_enabled);
           document.getElementById("psNotifyChanges").value = String(s.partner_shop_notify_changes !== false);
+          document.getElementById("psWorkerUrl").value = s.auto_sync_worker_url || "";
+          document.getElementById("psTelethonAuto").value = String(s.telethon_auto_sync !== false);
+        }
+
+        const stripTel = document.getElementById("stripTelethonStatus");
+        const stripApi = document.getElementById("stripApiStatus");
+        const stripMk = document.getElementById("stripMarkup");
+        if (stripTel) {
+          const telOn = s.telethon_auto_sync !== false;
+          stripTel.textContent = telOn ? "Đang bật" : "Đang tắt";
+          stripTel.style.color = telOn ? "#34d399" : "#f87171";
+        }
+        if (stripApi) {
+          const apiOn = !!s.partner_shop_enabled;
+          stripApi.textContent = apiOn ? `Bật (${s.partner_shop_sync_interval_secs || 180}s)` : "Đang tắt";
+          stripApi.style.color = apiOn ? "#34d399" : "#94a3b8";
+        }
+        if (stripMk) {
+          stripMk.textContent = "+" + fmtVnd(s.partner_shop_markup_vnd ?? 30000);
+          stripMk.style.color = "#fbbf24";
         }
 
         document.getElementById("kpiSupport").textContent = s.support_handle;
@@ -1771,9 +2169,8 @@
         .replace(/>/g, "&gt;");
     }
 
-    function toggleNewPlanBox() {
-      const box = document.getElementById("newPlanBox");
-      box.style.display = box.style.display === "none" ? "block" : "none";
+    function openNewPlanModal() {
+      document.getElementById("newPlanModal").classList.add("open");
     }
 
     function onNewPlanFormModeChange(fm) {
@@ -1802,7 +2199,11 @@
       });
       showToast(json.message);
       if (json.success) {
-        toggleNewPlanBox();
+        closeModal("newPlanModal");
+        document.getElementById("newPlanCode").value = "";
+        document.getElementById("newPlanName").value = "";
+        document.getElementById("newPlanCustomLabel").value = "";
+        document.getElementById("newPlanDesc").value = "";
         loadPlans();
       }
     }
@@ -1811,133 +2212,218 @@
       const listEl = document.getElementById("plansList");
       const json = await apiFetch("/api/v1/admin/plans");
       if (!json.success) {
-        listEl.innerHTML = `<span class="badge badge-err">${json.message}</span>`;
+        listEl.innerHTML = `<span class="badge badge-err">${escapeAttr(json.message)}</span>`;
         return;
       }
-      listEl.innerHTML = json.data.map(p => `
-        <div class="item-row">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:12px;">
-            <div style="font-weight:700;display:flex;align-items:center;gap:6px;">
-              <i class="bx bxs-diamond" style="color:#60a5fa;"></i>
-              <span>${escapeAttr(p.code)}</span>
-            </div>
-            <span class="badge ${!p.is_active ? 'badge-err' : (p.is_maintenance ? 'badge-warn' : 'badge-ok')}">${!p.is_active ? 'Đang tạm ẩn' : (p.is_maintenance ? 'Đang bảo trì' : 'Đang mở bán')}</span>
-          </div>
-
-          <div class="form-grid">
-            <div class="form-group" style="grid-column: 1 / -1;">
-              <label>Tên gói hiển thị trên Bot</label>
-              <input id="name_${p.id}" type="text" value="${escapeAttr(p.name)}" />
-            </div>
-            <div class="form-group">
-              <label>Giá bán (VND)</label>
-              <input id="price_${p.id}" type="number" value="${p.price_vnd}" min="1000" step="1000" />
-            </div>
-            <div class="form-group">
-              <label>Tồn kho</label>
-              <input id="stock_${p.id}" type="number" value="${p.available_stock}" min="0" />
-            </div>
-            <div class="form-group">
-              <label>Đã bán</label>
-              <input id="sold_${p.id}" type="number" value="${p.sold_count}" min="0" />
-            </div>
-            <div class="form-group">
-              <label>Thời hạn (tháng)</label>
-              <input id="months_${p.id}" type="number" value="${p.duration_months}" min="1" />
-            </div>
-            <div class="form-group">
-              <label>Thứ tự hiển thị</label>
-              <input id="order_${p.id}" type="number" value="${p.display_order}" />
-            </div>
-            <div class="form-group">
-              <label>Loại xử lý API</label>
-              <select id="apimode_${p.id}" style="width:100%;">
-                <option value="autopay" ${p.api_mode === 'autopay' ? 'selected' : ''}>Auto pay (autopay — kích hoạt tự động)</option>
-                <option value="extract" ${p.api_mode === 'extract' ? 'selected' : ''}>Tự pay (extract — trích xuất link ưu đãi)</option>
-                <option value="payadd" ${p.api_mode === 'payadd' ? 'selected' : ''}>Payadd (thêm phương thức thanh toán)</option>
-                <option value="manual" ${p.api_mode === 'manual' ? 'selected' : ''}>Xử lý thủ công (không đẩy API)</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Yêu cầu form khi khách mua</label>
-              <select id="formmode_${p.id}" style="width:100%;">
-                <option value="mail_pass_2fa" ${(p.form_mode || 'mail_pass_2fa') === 'mail_pass_2fa' ? 'selected' : ''}>Form đầy đủ: Email | Mật khẩu | 2FA</option>
-                <option value="email_only" ${p.form_mode === 'email_only' ? 'selected' : ''}>Chỉ cần nhập Email</option>
-                <option value="custom_note" ${p.form_mode === 'custom_note' ? 'selected' : ''}>Nhập 1 ô thông tin tùy chỉnh</option>
-                <option value="none" ${p.form_mode === 'none' ? 'selected' : ''}>Không cần điền form (mua ngay)</option>
-              </select>
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-              <label>Nhãn hướng dẫn ô nhập (tùy chọn — cho chế độ Chỉ Email / Tùy chỉnh)</label>
-              <input id="customlbl_${p.id}" type="text" value="${escapeAttr(p.custom_field_label || '')}" placeholder="VD: Nhập địa chỉ Email nhận lời mời Family / Canva Pro..." />
-            </div>
-            <div class="form-group">
-              <label>Trạng thái hiển thị</label>
-              <select id="active_${p.id}" style="width:100%;">
-                <option value="true" ${p.is_active ? 'selected' : ''}>Đang mở bán</option>
-                <option value="false" ${!p.is_active ? 'selected' : ''}>Tạm ẩn khỏi Bot</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>Chế độ bảo trì sản phẩm</label>
-              <select id="maint_${p.id}" style="width:100%;">
-                <option value="false" ${!p.is_maintenance ? 'selected' : ''}>Hoạt động bình thường (cho phép mua)</option>
-                <option value="true" ${p.is_maintenance ? 'selected' : ''}>Đang bảo trì (vẫn hiện, bấm mua báo bảo trì)</option>
-              </select>
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-              <label>Nội dung thông báo khi khách bấm mua lúc bảo trì</label>
-              <input id="maintnote_${p.id}" type="text" value="${escapeAttr(p.maintenance_note || 'Vui lòng thử lại sau.')}" placeholder="Vui lòng thử lại sau." />
-            </div>
-            <div class="form-group" style="grid-column: 1 / -1;">
-              <label>Mô tả chi tiết hiển thị trên Telegram</label>
-              <textarea id="desc_${p.id}" rows="5">${escapeAttr(p.description_note)}</textarea>
-            </div>
-          </div>
-
-          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;">
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              <label style="display:flex;align-items:center;gap:7px;font-size:0.82rem;color:var(--muted);cursor:pointer;">
-                <input id="notify_${p.id}" type="checkbox" checked style="width:16px;height:16px;accent-color:#3b82f6;" />
-                <span>Gửi thông báo "Hàng mới vừa lên kho" tới tất cả user khi tăng tồn kho</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:7px;font-size:0.82rem;color:var(--muted);cursor:pointer;">
-                <input id="notify_maint_${p.id}" type="checkbox" checked style="width:16px;height:16px;accent-color:#f59e0b;" />
-                <span>Gửi thông báo bảo trì / mở bán lại tới tất cả user khi bật hoặc tắt bảo trì</span>
-              </label>
-            </div>
-            <button class="btn btn-primary" onclick="savePlan('${p.id}')">
-              <i class="bx bx-save"></i> Lưu thay đổi gói
-            </button>
-          </div>
-        </div>
-      `).join("");
+      allPlans = json.data || [];
+      allPlans.forEach(p => { plansById[p.id] = p; });
+      renderPlansTable();
     }
 
-    async function savePlan(id) {
+    function renderPlansTable() {
+      const listEl = document.getElementById("plansList");
+      const countEl = document.getElementById("plansCountLabel");
+      const q = (document.getElementById("planSearchInput")?.value || "").trim().toLowerCase();
+      const statusFilter = document.getElementById("planStatusFilter")?.value || "";
+
+      const filtered = allPlans.filter(p => {
+        if (q) {
+          const hay = `${p.name || ""} ${p.code || ""}`.toLowerCase();
+          if (!hay.includes(q)) return false;
+        }
+        if (statusFilter === "active") return p.is_active && !p.is_maintenance;
+        if (statusFilter === "maintenance") return p.is_active && p.is_maintenance;
+        if (statusFilter === "hidden") return !p.is_active;
+        return true;
+      });
+
+      if (countEl) countEl.textContent = `${filtered.length} / ${allPlans.length} sản phẩm`;
+
+      if (!filtered.length) {
+        listEl.innerHTML = `<div style="padding:18px;text-align:center;color:var(--muted);">Không có sản phẩm nào phù hợp.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = `
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Sản phẩm</th>
+                <th>Giá bán</th>
+                <th>Kho / Đã bán</th>
+                <th>Form &amp; Xử lý</th>
+                <th>Trạng thái</th>
+                <th style="text-align:right;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${filtered.map(p => {
+                const statusBadge = !p.is_active
+                  ? '<span class="badge badge-err">Tạm ẩn</span>'
+                  : (p.is_maintenance
+                    ? '<span class="badge badge-warn">Bảo trì</span>'
+                    : '<span class="badge badge-ok">Đang bán</span>');
+                const stockColor = p.available_stock > 0 ? '#f8fafc' : '#f87171';
+                return `
+                  <tr>
+                    <td style="color:var(--muted);font-weight:600;">${p.display_order}</td>
+                    <td>
+                      <div class="td-title">${escapeAttr(p.name)}</div>
+                      <div class="td-sub">${escapeAttr(p.code)} • ${p.duration_months} tháng</div>
+                    </td>
+                    <td style="font-weight:800;color:#34d399;white-space:nowrap;">${fmtVnd(p.price_vnd)}</td>
+                    <td style="white-space:nowrap;">
+                      <strong style="color:${stockColor};">${p.available_stock}</strong>
+                      <span style="color:var(--muted);"> / ${p.sold_count}</span>
+                    </td>
+                    <td>
+                      <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                        <span class="badge" style="background:rgba(59,130,246,0.16);color:#93c5fd;">${escapeAttr(formatFormModeLabel(p.form_mode))}</span>
+                        <span class="badge" style="background:rgba(148,163,184,0.14);color:#cbd5e1;">${escapeAttr(formatApiModeLabel(p.api_mode))}</span>
+                      </div>
+                    </td>
+                    <td>${statusBadge}</td>
+                    <td>
+                      <div class="td-actions">
+                        <button class="btn btn-ghost btn-sm" onclick="openPlanDetailModal('${p.id}')" title="Xem chi tiết">
+                          <i class="bx bx-show"></i> Chi tiết
+                        </button>
+                        <button class="btn btn-primary btn-sm" onclick="openEditPlanModal('${p.id}')" title="Chỉnh sửa">
+                          <i class="bx bx-edit-alt"></i> Sửa
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function openPlanDetailModal(id) {
+      const p = plansById[id];
+      if (!p) return;
+      activePlanId = id;
+      document.getElementById("pdTitle").textContent = p.name;
+      const statusText = !p.is_active ? "Tạm ẩn khỏi Bot & Web" : (p.is_maintenance ? "Đang bảo trì" : "Đang mở bán");
+      document.getElementById("pdBody").innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-item"><span>Mã sản phẩm</span><strong>${escapeAttr(p.code)}</strong></div>
+          <div class="detail-item"><span>Giá bán hiện tại</span><strong style="color:#34d399;">${fmtVnd(p.price_vnd)}</strong></div>
+          <div class="detail-item"><span>Tồn kho / Đã bán</span><strong>${p.available_stock} còn / ${p.sold_count} đã bán</strong></div>
+          <div class="detail-item"><span>Thời hạn / Thứ tự</span><strong>${p.duration_months} tháng • STT #${p.display_order}</strong></div>
+          <div class="detail-item"><span>Yêu cầu form khi mua</span><strong>${escapeAttr(formatFormModeLabel(p.form_mode))}</strong></div>
+          <div class="detail-item"><span>Chế độ xử lý</span><strong>${escapeAttr(formatApiModeLabel(p.api_mode))}</strong></div>
+          <div class="detail-item"><span>Trạng thái</span><strong>${escapeAttr(statusText)}</strong></div>
+          <div class="detail-item"><span>Nhãn ô nhập tùy chỉnh</span><strong>${escapeAttr(p.custom_field_label || "Mặc định")}</strong></div>
+        </div>
+        ${p.is_maintenance ? `<div style="margin-bottom:12px;padding:10px 12px;border-radius:10px;background:var(--warn-soft);border:1px solid rgba(245,158,11,0.35);color:#fbbf24;font-size:0.83rem;"><strong>Thông báo bảo trì:</strong> ${escapeAttr(p.maintenance_note || "Vui lòng thử lại sau.")}</div>` : ""}
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;font-weight:600;">Mô tả chi tiết hiển thị trên Telegram &amp; Website</div>
+        <div class="detail-desc">${escapeAttr(p.description_note || "Chưa có mô tả.")}</div>
+      `;
+      document.getElementById("planDetailModal").classList.add("open");
+    }
+
+    function switchDetailToEdit() {
+      const id = activePlanId;
+      closeModal("planDetailModal");
+      if (id) openEditPlanModal(id);
+    }
+
+    function openEditPlanModal(id) {
+      const p = plansById[id];
+      if (!p) return;
+      activePlanId = id;
+      document.getElementById("epTitle").textContent = `Sửa sản phẩm — ${p.code}`;
+      document.getElementById("epName").value = p.name || "";
+      document.getElementById("epPrice").value = p.price_vnd ?? 0;
+      document.getElementById("epStock").value = p.available_stock ?? 0;
+      document.getElementById("epSold").value = p.sold_count ?? 0;
+      document.getElementById("epMonths").value = p.duration_months ?? 1;
+      document.getElementById("epOrder").value = p.display_order ?? 1;
+      document.getElementById("epApiMode").value = p.api_mode || "manual";
+      document.getElementById("epFormMode").value = p.form_mode || "mail_pass_2fa";
+      document.getElementById("epCustomLabel").value = p.custom_field_label || "";
+      document.getElementById("epActive").value = String(!!p.is_active);
+      document.getElementById("epMaint").value = String(!!p.is_maintenance);
+      document.getElementById("epMaintNote").value = p.maintenance_note || "Vui lòng thử lại sau.";
+      document.getElementById("epDesc").value = p.description_note || "";
+      document.getElementById("epNotifyRestock").checked = true;
+      document.getElementById("epNotifyMaint").checked = true;
+      document.getElementById("editPlanModal").classList.add("open");
+    }
+
+    async function saveEditPlanModal() {
+      if (!activePlanId) return;
+      const btn = document.getElementById("epSaveBtn");
+      btn.disabled = true;
       const payload = {
-        name: document.getElementById("name_" + id).value.trim(),
-        price_vnd: Number(document.getElementById("price_" + id).value),
-        available_stock: Number(document.getElementById("stock_" + id).value),
-        sold_count: Number(document.getElementById("sold_" + id).value),
-        duration_months: Number(document.getElementById("months_" + id).value),
-        display_order: Number(document.getElementById("order_" + id).value),
-        api_mode: document.getElementById("apimode_" + id).value,
-        form_mode: document.getElementById("formmode_" + id).value,
-        custom_field_label: document.getElementById("customlbl_" + id).value.trim(),
-        is_active: document.getElementById("active_" + id).value === "true",
-        is_maintenance: document.getElementById("maint_" + id).value === "true",
-        maintenance_note: document.getElementById("maintnote_" + id).value.trim() || "Vui lòng thử lại sau.",
-        notify_restock: document.getElementById("notify_" + id)?.checked !== false,
-        notify_maintenance: document.getElementById("notify_maint_" + id)?.checked !== false,
-        description_note: document.getElementById("desc_" + id).value.trim()
+        name: document.getElementById("epName").value.trim(),
+        price_vnd: Number(document.getElementById("epPrice").value),
+        available_stock: Number(document.getElementById("epStock").value),
+        sold_count: Number(document.getElementById("epSold").value),
+        duration_months: Number(document.getElementById("epMonths").value),
+        display_order: Number(document.getElementById("epOrder").value),
+        api_mode: document.getElementById("epApiMode").value,
+        form_mode: document.getElementById("epFormMode").value,
+        custom_field_label: document.getElementById("epCustomLabel").value.trim(),
+        is_active: document.getElementById("epActive").value === "true",
+        is_maintenance: document.getElementById("epMaint").value === "true",
+        maintenance_note: document.getElementById("epMaintNote").value.trim() || "Vui lòng thử lại sau.",
+        notify_restock: document.getElementById("epNotifyRestock").checked,
+        notify_maintenance: document.getElementById("epNotifyMaint").checked,
+        description_note: document.getElementById("epDesc").value.trim()
       };
-      const json = await apiFetch(`/api/v1/admin/plans/${id}`, {
+      const json = await apiFetch(`/api/v1/admin/plans/${activePlanId}`, {
+        method: "PUT",
+        body: JSON.stringify(payload)
+      });
+      btn.disabled = false;
+      showToast(json.message);
+      if (json.success) {
+        closeModal("editPlanModal");
+        loadPlans();
+      }
+    }
+
+    function openSyncConfigModal() {
+      const s = latestSettings || {};
+      document.getElementById("msTelethonAuto").value = String(s.telethon_auto_sync !== false);
+      document.getElementById("msMarkupVnd").value = s.partner_shop_markup_vnd ?? 30000;
+      document.getElementById("msWorkerUrl").value = s.auto_sync_worker_url || "";
+      document.getElementById("msApiEnabled").value = String(!!s.partner_shop_enabled);
+      document.getElementById("msSyncInterval").value = s.partner_shop_sync_interval_secs ?? 180;
+      document.getElementById("msNotifyChanges").value = String(s.partner_shop_notify_changes !== false);
+      document.getElementById("syncConfigModal").classList.add("open");
+    }
+
+    async function saveSyncConfigModal() {
+      const s = latestSettings || {};
+      const payload = {
+        partner_shop_base_url: s.partner_shop_base_url || document.getElementById("psBaseUrl")?.value.trim() || "https://telebot.aidesign.io.vn/api/partner-api",
+        partner_shop_api_key: null,
+        partner_shop_enabled: document.getElementById("msApiEnabled").value === "true",
+        partner_shop_markup_vnd: Number(document.getElementById("msMarkupVnd").value || 0),
+        partner_shop_sync_interval_secs: Number(document.getElementById("msSyncInterval").value || 180),
+        partner_shop_notify_changes: document.getElementById("msNotifyChanges").value === "true",
+        auto_sync_worker_url: document.getElementById("msWorkerUrl").value.trim(),
+        telethon_auto_sync: document.getElementById("msTelethonAuto").value === "true"
+      };
+      const json = await apiFetch("/api/v1/admin/partner-shop/settings", {
         method: "PUT",
         body: JSON.stringify(payload)
       });
       showToast(json.message);
-      if (json.success) loadPlans();
+      if (json.success) {
+        closeModal("syncConfigModal");
+        loadSettings();
+        loadPlans();
+        loadPartnerShopProducts();
+      }
     }
 
     function fillBroadcastPreset(type) {
@@ -1976,7 +2462,9 @@
         partner_shop_enabled: document.getElementById("psEnabled").value === "true",
         partner_shop_markup_vnd: Number(document.getElementById("psMarkupVnd").value || 0),
         partner_shop_sync_interval_secs: Number(document.getElementById("psSyncInterval").value || 180),
-        partner_shop_notify_changes: document.getElementById("psNotifyChanges").value === "true"
+        partner_shop_notify_changes: document.getElementById("psNotifyChanges").value === "true",
+        auto_sync_worker_url: document.getElementById("psWorkerUrl").value.trim(),
+        telethon_auto_sync: document.getElementById("psTelethonAuto").value === "true"
       };
       const json = await apiFetch("/api/v1/admin/partner-shop/settings", {
         method: "PUT",
@@ -1984,6 +2472,7 @@
       });
       showToast(json.message);
       if (json.success) {
+        loadSettings();
         loadPartnerShopBalance(false);
         loadPartnerShopProducts();
       }
@@ -2012,20 +2501,30 @@
       if (showNotify) showToast("Đã cập nhật số dư ví Shop đối tác!");
     }
 
-    async function syncPartnerShopNow() {
-      const btn = document.getElementById("psSyncBtn");
-      btn.disabled = true;
-      btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Đang đồng bộ...';
-      const json = await apiFetch("/api/v1/admin/partner-shop/sync", {
-        method: "POST",
-        body: JSON.stringify({ notify_changes: document.getElementById("psNotifyChanges")?.value === "true" })
-      });
-      btn.disabled = false;
-      btn.innerHTML = '<i class="bx bx-sync"></i> Đồng bộ sản phẩm ngay';
-      showToast(json.message);
-      if (json.success) {
-        loadPartnerShopProducts();
-        loadPartnerShopBalance(false);
+    async function syncAllSourcesNow(btnEl) {
+      const btn = btnEl || document.getElementById("psSyncBtn");
+      const origHtml = btn ? btn.innerHTML : "";
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bx bx-loader-alt bx-spin"></i> Đang đồng bộ...';
+      }
+      try {
+        const notify = latestSettings ? latestSettings.partner_shop_notify_changes !== false : true;
+        const json = await apiFetch("/api/v1/admin/partner-shop/sync-all", {
+          method: "POST",
+          body: JSON.stringify({ notify_changes: notify, scan_limit: 30 })
+        });
+        showToast(json.message || "Hoàn tất đồng bộ!");
+        if (json.success) {
+          loadPlans();
+          loadPartnerShopProducts();
+          loadPartnerShopBalance(false);
+        }
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+        }
       }
     }
 
@@ -2039,75 +2538,117 @@
       }
       const items = json.data || [];
       if (!items.length) {
-        box.textContent = "Chưa có sản phẩm nào từ Shop đối tác (bên đối tác hiện đang có 0 sản phẩm hoặc bạn chưa bấm Đồng bộ).";
+        box.textContent = "Chưa có sản phẩm nào từ API Shop đối tác (sản phẩm đồng bộ từ Bot đối tác nằm trực tiếp ở tab Sản phẩm).";
         return;
       }
-      box.innerHTML = items.map(p => {
-        const profit = p.sell_price_vnd - p.partner_price_vnd;
-        return `
-          <div class="item-row">
-            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px;">
-              <div style="font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                <span>#${p.external_id} — ${escapeAttr(p.name)}</span>
-                ${p.category_name ? `<span class="badge" style="background:rgba(59,130,246,0.16);color:#93c5fd;">${escapeAttr(p.category_name)}</span>` : ''}
-                <span class="badge ${!p.is_active ? 'badge-err' : (p.is_maintenance ? 'badge-warn' : 'badge-ok')}">
-                  ${!p.is_active ? 'Tạm ẩn' : (p.is_maintenance ? 'Đang bảo trì' : 'Đang mở bán')}
-                </span>
-              </div>
-              <div style="font-size:0.84rem;">
-                Gốc: <strong>${fmtVnd(p.partner_price_vnd)}</strong> • Lời: <strong style="color:#fbbf24;">+${fmtVnd(profit)}</strong> • Giá bán: <strong style="color:#34d399;">${fmtVnd(p.sell_price_vnd)}</strong>
-              </div>
-            </div>
-            <div style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;">
-              Loại: <strong>${escapeAttr(p.product_type)}</strong> • Kho đối tác: <strong>${p.stock}</strong> • Đã bán: <strong>${p.sold_count}</strong> • Đồng bộ lúc: ${new Date(p.last_synced_at).toLocaleString("vi-VN")}
-            </div>
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Lời riêng sản phẩm này (VND — để trống = dùng mặc định)</label>
-                <input id="ps_mk_${p.id}" type="number" min="0" step="1000" value="${p.custom_markup_vnd ?? ''}" placeholder="Mặc định hệ thống" />
-              </div>
-              <div class="form-group">
-                <label>Hiển thị bán</label>
-                <select id="ps_act_${p.id}" style="width:100%;">
-                  <option value="true" ${p.is_active ? 'selected' : ''}>Đang mở bán</option>
-                  <option value="false" ${!p.is_active ? 'selected' : ''}>Tạm ẩn khỏi Bot &amp; Web</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Trạng thái bảo trì</label>
-                <select id="ps_mnt_${p.id}" style="width:100%;">
-                  <option value="false" ${!p.is_maintenance ? 'selected' : ''}>Hoạt động bình thường</option>
-                  <option value="true" ${p.is_maintenance ? 'selected' : ''}>Đang bảo trì</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label>Nội dung thông báo bảo trì</label>
-                <input id="ps_mnote_${p.id}" type="text" value="${escapeAttr(p.maintenance_note || 'Vui lòng thử lại sau.')}" />
-              </div>
-            </div>
-            <div style="margin-top:10px;display:flex;justify-content:flex-end;">
-              <button class="btn btn-primary" onclick="savePartnerProduct('${p.id}')"><i class="bx bx-save"></i> Lưu sản phẩm</button>
-            </div>
-          </div>
-        `;
-      }).join("");
+      items.forEach(p => { partnerProdsById[p.id] = p; });
+      box.innerHTML = `
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>ID &amp; Sản phẩm</th>
+                <th>Giá gốc</th>
+                <th>Lời</th>
+                <th>Giá bán</th>
+                <th>Kho / Đã bán</th>
+                <th>Trạng thái</th>
+                <th style="text-align:right;">Thao tác</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items.map(p => {
+                const profit = p.sell_price_vnd - p.partner_price_vnd;
+                const statusBadge = !p.is_active
+                  ? '<span class="badge badge-err">Tạm ẩn</span>'
+                  : (p.is_maintenance
+                    ? '<span class="badge badge-warn">Bảo trì</span>'
+                    : '<span class="badge badge-ok">Đang bán</span>');
+                return `
+                  <tr>
+                    <td>
+                      <div class="td-title">#${p.external_id} — ${escapeAttr(p.name)}</div>
+                      <div class="td-sub">${escapeAttr(p.category_name || p.product_type)}</div>
+                    </td>
+                    <td style="white-space:nowrap;">${fmtVnd(p.partner_price_vnd)}</td>
+                    <td style="color:#fbbf24;font-weight:700;white-space:nowrap;">+${fmtVnd(profit)}</td>
+                    <td style="color:#34d399;font-weight:800;white-space:nowrap;">${fmtVnd(p.sell_price_vnd)}</td>
+                    <td style="white-space:nowrap;"><strong>${p.stock}</strong> <span style="color:var(--muted);">/ ${p.sold_count}</span></td>
+                    <td>${statusBadge}</td>
+                    <td>
+                      <div class="td-actions">
+                        <button class="btn btn-ghost btn-sm" onclick="openPartnerProdDetailModal('${p.id}')"><i class="bx bx-show"></i> Chi tiết</button>
+                        <button class="btn btn-primary btn-sm" onclick="openEditPartnerProdModal('${p.id}')"><i class="bx bx-edit-alt"></i> Sửa</button>
+                      </div>
+                    </td>
+                  </tr>
+                `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
     }
 
-    async function savePartnerProduct(id) {
-      const rawMk = document.getElementById("ps_mk_" + id).value.trim();
+    function openPartnerProdDetailModal(id) {
+      const p = partnerProdsById[id];
+      if (!p) return;
+      activePartnerProdId = id;
+      const profit = p.sell_price_vnd - p.partner_price_vnd;
+      document.getElementById("ppdTitle").textContent = `#${p.external_id} — ${p.name}`;
+      document.getElementById("ppdBody").innerHTML = `
+        <div class="detail-grid">
+          <div class="detail-item"><span>Giá gốc đối tác</span><strong>${fmtVnd(p.partner_price_vnd)}</strong></div>
+          <div class="detail-item"><span>Lợi nhuận</span><strong style="color:#fbbf24;">+${fmtVnd(profit)} ${p.custom_markup_vnd != null ? "(riêng)" : "(mặc định)"}</strong></div>
+          <div class="detail-item"><span>Giá bán ra khách</span><strong style="color:#34d399;">${fmtVnd(p.sell_price_vnd)}</strong></div>
+          <div class="detail-item"><span>Kho / Đã bán</span><strong>${p.stock} còn / ${p.sold_count} đã bán</strong></div>
+          <div class="detail-item"><span>Danh mục / Loại</span><strong>${escapeAttr(p.category_name || "Không có")} (${escapeAttr(p.product_type)})</strong></div>
+          <div class="detail-item"><span>Đồng bộ gần nhất</span><strong>${new Date(p.last_synced_at).toLocaleString("vi-VN")}</strong></div>
+        </div>
+        <div style="font-size:0.78rem;color:var(--muted);margin-bottom:6px;font-weight:600;">Mô tả sản phẩm</div>
+        <div class="detail-desc">${escapeAttr(p.description || "Không có mô tả.")}</div>
+      `;
+      document.getElementById("partnerProdDetailModal").classList.add("open");
+    }
+
+    function switchPartnerDetailToEdit() {
+      const id = activePartnerProdId;
+      closeModal("partnerProdDetailModal");
+      if (id) openEditPartnerProdModal(id);
+    }
+
+    function openEditPartnerProdModal(id) {
+      const p = partnerProdsById[id];
+      if (!p) return;
+      activePartnerProdId = id;
+      document.getElementById("eppTitle").textContent = `Sửa #${p.external_id} — ${p.name}`;
+      document.getElementById("eppSummary").innerHTML = `Giá gốc: <strong>${fmtVnd(p.partner_price_vnd)}</strong> • Giá bán hiện tại: <strong style="color:#34d399;">${fmtVnd(p.sell_price_vnd)}</strong>`;
+      document.getElementById("eppCustomMarkup").value = p.custom_markup_vnd ?? "";
+      document.getElementById("eppActive").value = String(!!p.is_active);
+      document.getElementById("eppMaint").value = String(!!p.is_maintenance);
+      document.getElementById("eppMaintNote").value = p.maintenance_note || "Vui lòng thử lại sau.";
+      document.getElementById("editPartnerProdModal").classList.add("open");
+    }
+
+    async function saveEditPartnerProdModal() {
+      if (!activePartnerProdId) return;
+      const rawMk = document.getElementById("eppCustomMarkup").value.trim();
       const payload = {
         set_custom_markup: true,
         custom_markup_vnd: rawMk === "" ? null : Number(rawMk),
-        is_active: document.getElementById("ps_act_" + id).value === "true",
-        is_maintenance: document.getElementById("ps_mnt_" + id).value === "true",
-        maintenance_note: document.getElementById("ps_mnote_" + id).value.trim() || "Vui lòng thử lại sau."
+        is_active: document.getElementById("eppActive").value === "true",
+        is_maintenance: document.getElementById("eppMaint").value === "true",
+        maintenance_note: document.getElementById("eppMaintNote").value.trim() || "Vui lòng thử lại sau."
       };
-      const json = await apiFetch(`/api/v1/admin/partner-shop/products/${id}`, {
+      const json = await apiFetch(`/api/v1/admin/partner-shop/products/${activePartnerProdId}`, {
         method: "PUT",
         body: JSON.stringify(payload)
       });
       showToast(json.message);
-      if (json.success) loadPartnerShopProducts();
+      if (json.success) {
+        closeModal("editPartnerProdModal");
+        loadPartnerShopProducts();
+      }
     }
 
     async function loadPartnerShopOrders() {
@@ -2120,22 +2661,41 @@
         box.textContent = "Chưa có đơn mua sản phẩm Shop đối tác nào.";
         return;
       }
-      box.innerHTML = orders.map(o => `
-        <div class="item-row">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <strong>#${escapeAttr(o.order_code)}</strong>
-              <span class="badge ${o.status === 'COMPLETED' ? 'badge-ok' : o.status === 'REFUNDED' ? 'badge-err' : 'badge-warn'}">${o.status}</span>
-              <span>${escapeAttr(o.product_name)} × <strong>${o.quantity}</strong></span>
-            </div>
-            <div style="font-size:0.84rem;">
-              Thu: <strong>${fmtVnd(o.total_sell_price_vnd)}</strong> • Gốc: ${fmtVnd(o.total_partner_cost_vnd)} • Lời: <strong style="color:#34d399;">+${fmtVnd(o.profit_vnd)}</strong>
-            </div>
-          </div>
-          ${o.error_note ? `<div style="font-size:0.78rem;color:#fca5a5;margin-top:6px;">Lỗi: ${escapeAttr(o.error_note)}</div>` : ''}
-          <div style="font-size:0.74rem;color:var(--muted);margin-top:4px;">${new Date(o.created_at).toLocaleString("vi-VN")}</div>
+      box.innerHTML = `
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Mã đơn</th>
+                <th>Sản phẩm</th>
+                <th>SL</th>
+                <th>Doanh thu</th>
+                <th>Giá gốc</th>
+                <th>Lợi nhuận</th>
+                <th>Trạng thái</th>
+                <th>Thời gian</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${orders.map(o => `
+                <tr>
+                  <td><strong>#${escapeAttr(o.order_code)}</strong></td>
+                  <td>
+                    <div class="td-title">${escapeAttr(o.product_name)}</div>
+                    ${o.error_note ? `<div style="font-size:0.74rem;color:#fca5a5;">${escapeAttr(o.error_note)}</div>` : ""}
+                  </td>
+                  <td><strong>${o.quantity}</strong></td>
+                  <td style="white-space:nowrap;"><strong>${fmtVnd(o.total_sell_price_vnd)}</strong></td>
+                  <td style="white-space:nowrap;color:var(--muted);">${fmtVnd(o.total_partner_cost_vnd)}</td>
+                  <td style="white-space:nowrap;color:#34d399;font-weight:700;">+${fmtVnd(o.profit_vnd)}</td>
+                  <td><span class="badge ${o.status === 'COMPLETED' ? 'badge-ok' : o.status === 'REFUNDED' ? 'badge-err' : 'badge-warn'}">${o.status}</span></td>
+                  <td style="white-space:nowrap;color:var(--muted);font-size:0.78rem;">${new Date(o.created_at).toLocaleString("vi-VN")}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
         </div>
-      `).join("");
+      `;
     }
 
     async function manualCredit() {

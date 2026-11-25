@@ -1406,9 +1406,11 @@ pub struct UpdatePartnerShopSettingsReq {
     pub partner_shop_markup_vnd: i64,
     pub partner_shop_sync_interval_secs: i32,
     pub partner_shop_notify_changes: bool,
+    pub auto_sync_worker_url: Option<String>,
+    pub telethon_auto_sync: Option<bool>,
 }
 
-/// Update Partner Shop API credentials, profit markup (default +30,000 VND) & sync settings.
+/// Update Partner Shop API & Telethon Auto-Sync configuration, profit markup (default +30,000 VND) & sync settings.
 pub async fn update_partner_shop_settings(
     State(state): State<SharedState>,
     Extension(ctx): Extension<RequestContext>,
@@ -1422,12 +1424,209 @@ pub async fn update_partner_shop_settings(
         payload.partner_shop_markup_vnd,
         payload.partner_shop_sync_interval_secs,
         payload.partner_shop_notify_changes,
+        payload.auto_sync_worker_url.as_deref(),
+        payload.telethon_auto_sync,
     )
     .await?;
 
     Ok(ApiResponse::ok(
         updated,
-        "Đã lưu cấu hình Shop đối tác & cập nhật giá bán theo mức lời mới!",
+        "Đã lưu cấu hình đồng bộ & cập nhật giá bán theo mức lời mới!",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Serialize)]
+pub struct PartnerSyncConfigRes {
+    pub partner_shop_enabled: bool,
+    pub telethon_auto_sync: bool,
+    pub partner_shop_markup_vnd: i64,
+    pub partner_shop_notify_changes: bool,
+    pub auto_sync_worker_url: String,
+}
+
+/// Lightweight live sync config endpoint polled by the 24/7 Telethon Auto-Sync Worker.
+pub async fn get_partner_sync_config(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+) -> Result<ApiResponse<PartnerSyncConfigRes>, AppError> {
+    let s = settings_repo::get_settings(&state.pool).await?;
+    Ok(ApiResponse::ok(
+        PartnerSyncConfigRes {
+            partner_shop_enabled: s.partner_shop_enabled,
+            telethon_auto_sync: s.telethon_auto_sync,
+            partner_shop_markup_vnd: s.partner_shop_markup_vnd,
+            partner_shop_notify_changes: s.partner_shop_notify_changes,
+            auto_sync_worker_url: s.auto_sync_worker_url,
+        },
+        "Lấy cấu hình tự động đồng bộ thành công",
+        ctx.request_id,
+    ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TriggerSyncAllReq {
+    pub notify_changes: Option<bool>,
+    pub scan_limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct WorkerSyncResult {
+    pub triggered: bool,
+    pub ok: bool,
+    pub scanned: u32,
+    pub matched: u32,
+    pub synced: u32,
+    pub failed: u32,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SyncAllSummary {
+    pub api_sync: Option<PartnerSyncSummary>,
+    pub api_message: String,
+    pub worker_sync: WorkerSyncResult,
+}
+
+#[derive(Debug, Deserialize)]
+struct RemoteWorkerSyncResp {
+    #[serde(default)]
+    ok: bool,
+    #[serde(default)]
+    scanned: u32,
+    #[serde(default)]
+    matched: u32,
+    #[serde(default)]
+    synced: u32,
+    #[serde(default)]
+    failed: u32,
+    #[serde(default)]
+    message: Option<String>,
+}
+
+/// Trigger immediate manual sync across BOTH Partner Shop API and the 24/7 Telethon Auto-Sync Worker.
+pub async fn sync_all_partner_sources(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Json(payload): Json<TriggerSyncAllReq>,
+) -> Result<ApiResponse<SyncAllSummary>, AppError> {
+    let settings = settings_repo::get_settings(&state.pool).await?;
+    let notify = payload
+        .notify_changes
+        .unwrap_or(settings.partner_shop_notify_changes);
+    let scan_limit = payload.scan_limit.unwrap_or(30).clamp(5, 100);
+
+    // 1. Partner Shop API sync (if API key configured)
+    let (api_sync, api_message) = if !settings.partner_shop_api_key.trim().is_empty() {
+        match partner_shop_service::sync_partner_products(&state, notify).await {
+            Ok(summary) => {
+                let m = format!(
+                    "API đối tác: {} SP (mới {}, đổi giá {}, lên kho {})",
+                    summary.total_synced,
+                    summary.new_count,
+                    summary.price_changed_count,
+                    summary.restocked_count
+                );
+                (Some(summary), m)
+            }
+            Err(e) => (None, format!("API đối tác lỗi: {e}")),
+        }
+    } else {
+        (None, "API đối tác: chưa điền API Key".to_string())
+    };
+
+    // 2. Telethon Auto-Sync Worker on-demand scan (if auto_sync_worker_url configured)
+    let worker_url = settings.auto_sync_worker_url.trim().trim_end_matches('/');
+    let worker_sync = if !worker_url.is_empty() {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(45))
+            .build()
+            .map_err(|e| AppError::Internal(format!("Lỗi khởi tạo HTTP client: {e}")))?;
+
+        let target_url = format!("{worker_url}/sync");
+        let body = serde_json::json!({
+            "limit": scan_limit,
+            "notify_customers": notify
+        });
+        match client
+            .post(&target_url)
+            .header("X-Admin-Api-Key", &state.config.admin_api_key)
+            .json(&body)
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                let status = resp.status();
+                match resp.json::<RemoteWorkerSyncResp>().await {
+                    Ok(parsed) if status.is_success() && parsed.ok => WorkerSyncResult {
+                        triggered: true,
+                        ok: true,
+                        scanned: parsed.scanned,
+                        matched: parsed.matched,
+                        synced: parsed.synced,
+                        failed: parsed.failed,
+                        message: parsed.message.unwrap_or_else(|| {
+                            format!(
+                                "Bot đối tác: quét {} tin, khớp {} tin, đồng bộ {} SP",
+                                parsed.scanned, parsed.matched, parsed.synced
+                            )
+                        }),
+                    },
+                    Ok(parsed) => WorkerSyncResult {
+                        triggered: true,
+                        ok: false,
+                        scanned: parsed.scanned,
+                        matched: parsed.matched,
+                        synced: parsed.synced,
+                        failed: parsed.failed,
+                        message: parsed
+                            .message
+                            .unwrap_or_else(|| format!("Worker trả về lỗi HTTP {}", status)),
+                    },
+                    Err(_) => WorkerSyncResult {
+                        triggered: true,
+                        ok: false,
+                        scanned: 0,
+                        matched: 0,
+                        synced: 0,
+                        failed: 0,
+                        message: format!(
+                            "Worker phản hồi HTTP {} (hãy đảm bảo Worker đã cập nhật code mới nhất)",
+                            status
+                        ),
+                    },
+                }
+            }
+            Err(e) => WorkerSyncResult {
+                triggered: true,
+                ok: false,
+                scanned: 0,
+                matched: 0,
+                synced: 0,
+                failed: 0,
+                message: format!("Không gọi được Worker ({e})"),
+            },
+        }
+    } else {
+        WorkerSyncResult {
+            triggered: false,
+            ok: false,
+            scanned: 0,
+            matched: 0,
+            synced: 0,
+            failed: 0,
+            message: "Worker Bot đối tác: chưa điền URL Worker Render".to_string(),
+        }
+    };
+
+    let combined_msg = format!("{} • {}", api_message, worker_sync.message);
+    Ok(ApiResponse::ok(
+        SyncAllSummary {
+            api_sync,
+            api_message,
+            worker_sync,
+        },
+        combined_msg,
         ctx.request_id,
     ))
 }

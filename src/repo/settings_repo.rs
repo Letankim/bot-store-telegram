@@ -84,8 +84,9 @@ pub async fn update_settings(
     Ok(updated)
 }
 
-/// Update Partner Shop API configuration (`telebot.aidesign.io.vn/api/partner-api`)
+/// Update Partner Shop API & Telethon Auto-Sync configuration
 /// and immediately recalculate sell prices for all products using the default markup.
+#[allow(clippy::too_many_arguments)]
 pub async fn update_partner_shop_settings(
     pool: &PgPool,
     base_url: &str,
@@ -94,6 +95,8 @@ pub async fn update_partner_shop_settings(
     markup_vnd: i64,
     sync_interval_secs: i32,
     notify_changes: bool,
+    auto_sync_worker_url: Option<&str>,
+    telethon_auto_sync: Option<bool>,
 ) -> Result<AppSettings, AppError> {
     if markup_vnd < 0 {
         return Err(AppError::Validation(
@@ -107,6 +110,14 @@ pub async fn update_partner_shop_settings(
             "Base URL Shop đối tác không được để trống.".to_string(),
         ));
     }
+    let clean_worker_url = auto_sync_worker_url.map(|u| u.trim().trim_end_matches('/'));
+    if let Some(wu) = clean_worker_url {
+        if !wu.is_empty() && !wu.starts_with("http://") && !wu.starts_with("https://") {
+            return Err(AppError::Validation(
+                "URL Worker Auto-Sync phải bắt đầu bằng https:// hoặc http://".to_string(),
+            ));
+        }
+    }
 
     let updated = sqlx::query_as::<_, AppSettings>(
         "UPDATE app_settings
@@ -116,6 +127,8 @@ pub async fn update_partner_shop_settings(
              partner_shop_markup_vnd = $4,
              partner_shop_sync_interval_secs = $5,
              partner_shop_notify_changes = $6,
+             auto_sync_worker_url = COALESCE($7, auto_sync_worker_url),
+             telethon_auto_sync = COALESCE($8, telethon_auto_sync),
              updated_at = NOW()
          WHERE id = 1
          RETURNING *",
@@ -126,6 +139,8 @@ pub async fn update_partner_shop_settings(
     .bind(markup_vnd)
     .bind(clamped_interval)
     .bind(notify_changes)
+    .bind(clean_worker_url)
+    .bind(telethon_auto_sync)
     .fetch_one(pool)
     .await?;
 
