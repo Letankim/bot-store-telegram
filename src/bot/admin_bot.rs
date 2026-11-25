@@ -118,7 +118,7 @@ async fn handle_message(admin_bot: Bot, msg: Message, state: SharedState) -> Res
     };
     let telegram_id = from.id.0 as i64;
     let chat_id = msg.chat.id;
-    let text = msg.text().unwrap_or("").trim();
+    let text = msg.text().or_else(|| msg.caption()).unwrap_or("").trim();
 
     // 1. Auth gate — require ADMIN_API_KEY before any admin action
     if !is_authenticated(&state, telegram_id).await {

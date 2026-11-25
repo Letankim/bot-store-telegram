@@ -756,6 +756,7 @@ pub struct ParsedPartnerAlert {
     pub partner_price_vnd: i64,
     pub added_qty: i32,
     pub current_stock: i32,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -791,81 +792,176 @@ fn extract_first_integer(input: &str) -> Option<i64> {
     }
 }
 
-/// Parse a structured Vietnamese restock / price alert from a partner Telegram bot.
+fn is_banner_or_divider_line(line: &str) -> bool {
+    let lower = line.to_lowercase();
+    if lower.contains("hàng mới vừa lên kho")
+        || lower.contains("hang moi vua len kho")
+        || lower.contains("giảm giá")
+        || lower.contains("cập nhật giá")
+        || lower.contains("chọn số lượng muốn mua")
+        || lower.contains("chon so luong muon mua")
+    {
+        return true;
+    }
+    line.chars()
+        .all(|c| matches!(c, '─' | '━' | '═' | '-' | '=' | '_' | ' ' | '•'))
+}
+
+fn strip_leading_decorations(line: &str) -> String {
+    let trimmed = line.trim();
+    // Strip leading non-alphanumeric symbols/emojis (like "📦  ", "✨ ", "🔹 ")
+    let cleaned = trimmed.trim_start_matches(|c: char| !c.is_alphanumeric());
+    if cleaned.is_empty() {
+        trimmed.to_string()
+    } else {
+        cleaned.trim().to_string()
+    }
+}
+
+/// Parse BOTH partner bot formats:
+/// - Format A (Restock alert): `Sản phẩm: ... / Giá: 199.000đ / Vừa thêm: 51 / Kho hiện tại: 72`
+/// - Format B (Product card): `📦 Google Al Ultra 5x (20 TB)| KBH / Danh mục: ... / Giá: 80.000đ / Còn hàng: 16 / <Mô tả>`
 pub fn parse_partner_bot_alert(text: &str) -> Option<ParsedPartnerAlert> {
     let mut product_name: Option<String> = None;
+    let mut first_title_candidate: Option<String> = None;
     let mut partner_price_vnd: Option<i64> = None;
     let mut added_qty: Option<i32> = None;
     let mut current_stock: Option<i32> = None;
+    let mut desc_lines: Vec<String> = Vec::new();
+    let mut seen_metadata = false;
 
     for raw_line in text.lines() {
         let line = raw_line.trim();
         if line.is_empty() {
             continue;
         }
+        if is_banner_or_divider_line(line) {
+            continue;
+        }
         let lower = line.to_lowercase();
+        let mut is_meta_line = false;
 
-        if product_name.is_none() {
-            for marker in ["sản phẩm:", "san pham:", "tên gói:", "gói:"] {
-                if let Some(pos) = lower.find(marker) {
-                    let after = line[pos + marker.len()..].trim();
-                    if !after.is_empty() {
-                        product_name = Some(after.to_string());
-                        break;
-                    }
+        // Explicit product name markers
+        for marker in ["sản phẩm:", "san pham:", "tên gói:", "gói:"] {
+            if let Some(pos) = lower.find(marker) {
+                let after = line[pos + marker.len()..].trim();
+                if !after.is_empty() && product_name.is_none() {
+                    product_name = Some(after.to_string());
                 }
+                is_meta_line = true;
+                seen_metadata = true;
+                break;
             }
         }
-
-        if partner_price_vnd.is_none() {
-            for marker in ["giá mới:", "giá bán:", "giá:", "gia:"] {
-                if let Some(pos) = lower.find(marker) {
-                    let after = &line[pos + marker.len()..];
-                    if let Some(val) = extract_first_integer(after) {
-                        if val >= 1_000 {
-                            partner_price_vnd = Some(val);
-                            break;
-                        }
-                    }
-                }
-            }
+        if is_meta_line {
+            continue;
         }
 
-        if added_qty.is_none() {
-            for marker in ["vừa thêm:", "vua them:", "thêm mới:"] {
-                if let Some(pos) = lower.find(marker) {
-                    let after = &line[pos + marker.len()..];
-                    if let Some(val) = extract_first_integer(after) {
+        // Price markers
+        for marker in ["giá mới:", "giá bán:", "giá:", "gia:"] {
+            if let Some(pos) = lower.find(marker) {
+                let after = &line[pos + marker.len()..];
+                if let Some(val) = extract_first_integer(after) {
+                    if val >= 1_000 && partner_price_vnd.is_none() {
+                        partner_price_vnd = Some(val);
+                    }
+                }
+                is_meta_line = true;
+                seen_metadata = true;
+                break;
+            }
+        }
+        if is_meta_line {
+            continue;
+        }
+
+        // Added qty markers
+        for marker in ["vừa thêm:", "vua them:", "thêm mới:"] {
+            if let Some(pos) = lower.find(marker) {
+                let after = &line[pos + marker.len()..];
+                if let Some(val) = extract_first_integer(after) {
+                    if added_qty.is_none() {
                         added_qty = Some(val.clamp(0, 1_000_000) as i32);
-                        break;
                     }
                 }
+                is_meta_line = true;
+                seen_metadata = true;
+                break;
+            }
+        }
+        if is_meta_line {
+            continue;
+        }
+
+        // Stock markers (includes "Còn hàng: 16")
+        for marker in [
+            "kho hiện tại:",
+            "kho hien tai:",
+            "còn hàng:",
+            "con hang:",
+            "tồn kho:",
+            "ton kho:",
+            "còn lại:",
+            "số lượng:",
+            "stock:",
+        ] {
+            if let Some(pos) = lower.find(marker) {
+                let after = &line[pos + marker.len()..];
+                if let Some(val) = extract_first_integer(after) {
+                    if current_stock.is_none() {
+                        current_stock = Some(val.clamp(0, 1_000_000) as i32);
+                    }
+                }
+                is_meta_line = true;
+                seen_metadata = true;
+                break;
+            }
+        }
+        if is_meta_line {
+            continue;
+        }
+
+        // Other metadata lines to skip from description
+        if lower.contains("danh mục:")
+            || lower.contains("danh muc:")
+            || lower.contains("loại:")
+            || lower.contains("loai:")
+        {
+            seen_metadata = true;
+            continue;
+        }
+
+        // First non-metadata, non-banner line before metadata = Product title candidate (Format B)
+        if !seen_metadata && first_title_candidate.is_none() {
+            let cleaned = strip_leading_decorations(line);
+            if !cleaned.is_empty() {
+                first_title_candidate = Some(cleaned);
+                continue;
             }
         }
 
-        if current_stock.is_none() {
-            for marker in ["kho hiện tại:", "kho hien tai:", "tồn kho:", "ton kho:", "còn lại:"] {
-                if let Some(pos) = lower.find(marker) {
-                    let after = &line[pos + marker.len()..];
-                    if let Some(val) = extract_first_integer(after) {
-                        current_stock = Some(val.clamp(0, 1_000_000) as i32);
-                        break;
-                    }
-                }
-            }
+        // Lines after metadata = Product description
+        if seen_metadata {
+            desc_lines.push(line.to_string());
         }
     }
 
-    let name = product_name?;
+    let name = product_name.or(first_title_candidate)?;
     let price = partner_price_vnd?;
     let stock = current_stock.or(added_qty).unwrap_or(0);
     let added = added_qty.unwrap_or(0);
+    let description = if desc_lines.is_empty() {
+        None
+    } else {
+        Some(desc_lines.join("\n"))
+    };
 
     Some(ParsedPartnerAlert {
         product_name: name,
         partner_price_vnd: price,
         added_qty: added,
         current_stock: stock,
+        description,
     })
 }
 
@@ -908,10 +1004,12 @@ pub async fn ingest_partner_alert_message(
 
     let (plan, created, old_price, old_stock) = match existing {
         None => {
-            let desc = format!(
-                "• Sản phẩm giao tự động / xử lý nhanh.\n• Giá bán đã bao gồm hỗ trợ & bảo hành theo mô tả.\n• Liên hệ hỗ trợ: {}",
-                settings.support_handle
-            );
+            let desc = parsed.description.clone().unwrap_or_else(|| {
+                format!(
+                    "• Sản phẩm xử lý nhanh, hỗ trợ tận tình.\n• Liên hệ hỗ trợ: {}",
+                    settings.support_handle
+                )
+            });
             let inserted = plan_repo::create_plan(
                 &state.pool,
                 &code,
@@ -937,7 +1035,7 @@ pub async fn ingest_partner_alert_message(
                 Some(sell_price_vnd),
                 Some(parsed.current_stock),
                 None,
-                None,
+                parsed.description.as_deref(),
                 None,
                 None,
                 None,
@@ -1070,5 +1168,12 @@ mod tests {
         assert_eq!(p2.partner_price_vnd, 75_000);
         assert_eq!(p2.added_qty, 48);
         assert_eq!(p2.current_stock, 50);
+
+        let msg3 = "📦  Google Al Ultra 5x (20 TB)| KBH\n\n📂 Danh mục: GEMINI ULTRA 5X , 20X \n💰 Giá: 80.000đ / 1 cái\n📦 Loại: 📧 Tài khoản\n📊 Còn hàng: 16\n\nAi muốn nhanh thì tạo ID Apple mới gửi cho nhanh\nGửi tk mk gmail để admin kích hoạt\nFullmodel Antigravity veo3 10.000 credit\n\n🛒 Chọn số lượng muốn mua:";
+        let p3 = parse_partner_bot_alert(msg3).unwrap();
+        assert_eq!(p3.product_name, "Google Al Ultra 5x (20 TB)| KBH");
+        assert_eq!(p3.partner_price_vnd, 80_000);
+        assert_eq!(p3.current_stock, 16);
+        assert!(p3.description.as_deref().unwrap().contains("Fullmodel Antigravity veo3"));
     }
 }

@@ -47,9 +47,21 @@ def is_partner_product_alert(text: str) -> bool:
     if not text:
         return False
     low = text.lower()
-    has_product = any(k in low for k in ("sản phẩm:", "san pham:", "tên gói:", "gói:"))
     has_price = any(k in low for k in ("giá:", "gia:", "giá mới:", "giá bán:"))
-    return has_product and has_price
+    has_product_or_stock = any(
+        k in low
+        for k in (
+            "sản phẩm:",
+            "san pham:",
+            "tên gói:",
+            "gói:",
+            "còn hàng:",
+            "con hang:",
+            "kho hiện tại:",
+            "tồn kho:",
+        )
+    )
+    return has_price and has_product_or_stock
 
 
 def push_to_shop(base_url: str, admin_key: str, text: str, notify_customers: bool = True) -> None:
