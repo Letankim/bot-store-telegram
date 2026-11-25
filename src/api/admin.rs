@@ -32,7 +32,7 @@ use crate::{
     response::{ApiResponse, PaginationMeta},
     services::{
         activation_service::AdminOrderView,
-        partner_shop_service::{self, PartnerBalanceInfo, PartnerSyncSummary},
+        partner_shop_service::{self, IngestAlertOutcome, PartnerBalanceInfo, PartnerSyncSummary},
         smm_service,
     },
     state::SharedState,
@@ -1555,4 +1555,44 @@ pub async fn list_partner_shop_orders(
             total_pages,
         },
     ))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IngestPartnerMessageReq {
+    pub text: String,
+    pub notify_customers: Option<bool>,
+}
+
+/// Ingest a raw partner Telegram bot restock/price alert message (called automatically by
+/// the 24/7 Telethon auto-sync listener or manually), apply profit markup, upsert the product,
+/// and broadcast price/stock updates to customers.
+pub async fn ingest_partner_message(
+    State(state): State<SharedState>,
+    Extension(ctx): Extension<RequestContext>,
+    Json(payload): Json<IngestPartnerMessageReq>,
+) -> Result<ApiResponse<IngestAlertOutcome>, AppError> {
+    if payload.text.trim().is_empty() {
+        return Err(AppError::Validation(
+            "Nội dung tin nhắn không được để trống.".to_string(),
+        ));
+    }
+    let notify = payload.notify_customers.unwrap_or(true);
+    let outcome =
+        partner_shop_service::ingest_partner_alert_message(&state, &payload.text, notify).await?;
+    let msg = if outcome.created {
+        format!(
+            "Đã tự động tạo sản phẩm mới '{}' với giá bán {}đ (kho: {}).",
+            outcome.plan.name,
+            format_vnd(outcome.sell_price_vnd),
+            outcome.plan.available_stock
+        )
+    } else {
+        format!(
+            "Đã tự động cập nhật '{}' — giá bán {}đ (kho: {}).",
+            outcome.plan.name,
+            format_vnd(outcome.sell_price_vnd),
+            outcome.plan.available_stock
+        )
+    };
+    Ok(ApiResponse::ok(outcome, msg, ctx.request_id))
 }

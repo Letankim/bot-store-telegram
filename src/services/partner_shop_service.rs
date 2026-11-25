@@ -9,14 +9,16 @@ use teloxide::{
 use uuid::Uuid;
 
 use crate::{
-    bot::messages::escape_html,
+    bot::{keyboards, messages, messages::escape_html},
+    crypto::sha256_hex,
     domain::{
+        gemini_plan::GeminiPlan,
         partner_shop::{PartnerOrder, PartnerProduct},
         user::User,
         wallet::format_vnd,
     },
     error::AppError,
-    repo::{partner_repo, settings_repo, user_repo, wallet_repo},
+    repo::{partner_repo, plan_repo, settings_repo, user_repo, wallet_repo},
     state::SharedState,
 };
 
@@ -741,4 +743,332 @@ fn format_new_partner_product_broadcast(p: &PartnerProduct) -> String {
         format_vnd(p.sell_price_vnd),
         p.stock,
     )
+}
+
+// =============================================================================
+// Automatic Telegram Message Ingestion Parser & Plan Upsert
+// Parses partner bot alerts (e.g. "📢 HÀNG MỚI VỪA LÊN KHO ... Sản phẩm: ... Giá: ... Kho hiện tại: ...")
+// =============================================================================
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ParsedPartnerAlert {
+    pub product_name: String,
+    pub partner_price_vnd: i64,
+    pub added_qty: i32,
+    pub current_stock: i32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct IngestAlertOutcome {
+    pub plan: GeminiPlan,
+    pub created: bool,
+    pub partner_price_vnd: i64,
+    pub markup_vnd: i64,
+    pub sell_price_vnd: i64,
+    pub old_price_vnd: Option<i64>,
+    pub old_stock: Option<i32>,
+    pub broadcast_triggered: bool,
+}
+
+fn extract_first_integer(input: &str) -> Option<i64> {
+    let mut buf = String::new();
+    let mut started = false;
+    for ch in input.chars() {
+        if ch.is_ascii_digit() {
+            buf.push(ch);
+            started = true;
+        } else if started && (ch == '.' || ch == ',') {
+            // Thousands separator like 199.000đ or 75,000đ
+            continue;
+        } else if started {
+            break;
+        }
+    }
+    if buf.is_empty() {
+        None
+    } else {
+        buf.parse::<i64>().ok()
+    }
+}
+
+/// Parse a structured Vietnamese restock / price alert from a partner Telegram bot.
+pub fn parse_partner_bot_alert(text: &str) -> Option<ParsedPartnerAlert> {
+    let mut product_name: Option<String> = None;
+    let mut partner_price_vnd: Option<i64> = None;
+    let mut added_qty: Option<i32> = None;
+    let mut current_stock: Option<i32> = None;
+
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let lower = line.to_lowercase();
+
+        if product_name.is_none() {
+            for marker in ["sản phẩm:", "san pham:", "tên gói:", "gói:"] {
+                if let Some(pos) = lower.find(marker) {
+                    let after = line[pos + marker.len()..].trim();
+                    if !after.is_empty() {
+                        product_name = Some(after.to_string());
+                        break;
+                    }
+                }
+            }
+        }
+
+        if partner_price_vnd.is_none() {
+            for marker in ["giá mới:", "giá bán:", "giá:", "gia:"] {
+                if let Some(pos) = lower.find(marker) {
+                    let after = &line[pos + marker.len()..];
+                    if let Some(val) = extract_first_integer(after) {
+                        if val >= 1_000 {
+                            partner_price_vnd = Some(val);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        if added_qty.is_none() {
+            for marker in ["vừa thêm:", "vua them:", "thêm mới:"] {
+                if let Some(pos) = lower.find(marker) {
+                    let after = &line[pos + marker.len()..];
+                    if let Some(val) = extract_first_integer(after) {
+                        added_qty = Some(val.clamp(0, 1_000_000) as i32);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if current_stock.is_none() {
+            for marker in ["kho hiện tại:", "kho hien tai:", "tồn kho:", "ton kho:", "còn lại:"] {
+                if let Some(pos) = lower.find(marker) {
+                    let after = &line[pos + marker.len()..];
+                    if let Some(val) = extract_first_integer(after) {
+                        current_stock = Some(val.clamp(0, 1_000_000) as i32);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    let name = product_name?;
+    let price = partner_price_vnd?;
+    let stock = current_stock.or(added_qty).unwrap_or(0);
+    let added = added_qty.unwrap_or(0);
+
+    Some(ParsedPartnerAlert {
+        product_name: name,
+        partner_price_vnd: price,
+        added_qty: added,
+        current_stock: stock,
+    })
+}
+
+fn deterministic_auto_plan_code(product_name: &str) -> String {
+    let norm = product_name
+        .trim()
+        .to_lowercase()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    let hash = sha256_hex(&norm);
+    format!("AUTO_{}", hash[..10].to_uppercase())
+}
+
+/// Ingest a partner bot message text (called automatically by 24/7 Telethon listener or Admin Bot forward),
+/// calculate `sell_price = partner_price + partner_shop_markup_vnd` (default +30,000đ),
+/// upsert into `gemini_plans` (`api_mode = 'manual'`, `form_mode = 'none'`),
+/// and automatically broadcast price/restock alerts to all active Telegram customers!
+pub async fn ingest_partner_alert_message(
+    state: &SharedState,
+    raw_text: &str,
+    notify_customers: bool,
+) -> Result<IngestAlertOutcome, AppError> {
+    let parsed = parse_partner_bot_alert(raw_text).ok_or_else(|| {
+        AppError::Validation(
+            "Không nhận diện được định dạng thông báo sản phẩm (cần tối thiểu dòng 'Sản phẩm:' và 'Giá:').".to_string(),
+        )
+    })?;
+
+    let settings = settings_repo::get_settings(&state.pool).await?;
+    let markup_vnd = settings.partner_shop_markup_vnd.max(0);
+    let sell_price_vnd = parsed.partner_price_vnd.saturating_add(markup_vnd);
+    let code = deterministic_auto_plan_code(&parsed.product_name);
+
+    let existing: Option<GeminiPlan> =
+        sqlx::query_as("SELECT * FROM gemini_plans WHERE code = $1")
+            .bind(&code)
+            .fetch_optional(&state.pool)
+            .await?;
+
+    let (plan, created, old_price, old_stock) = match existing {
+        None => {
+            let desc = format!(
+                "• Sản phẩm giao tự động / xử lý nhanh.\n• Giá bán đã bao gồm hỗ trợ & bảo hành theo mô tả.\n• Liên hệ hỗ trợ: {}",
+                settings.support_handle
+            );
+            let inserted = plan_repo::create_plan(
+                &state.pool,
+                &code,
+                &parsed.product_name,
+                1,
+                sell_price_vnd,
+                parsed.current_stock,
+                &desc,
+                "manual",
+                "none",
+                "",
+                50,
+            )
+            .await?;
+            (inserted, true, None, None)
+        }
+        Some(prev) => {
+            let updated = plan_repo::update_plan_full(
+                &state.pool,
+                prev.id,
+                Some(&parsed.product_name),
+                None,
+                Some(sell_price_vnd),
+                Some(parsed.current_stock),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await?;
+            (
+                updated,
+                false,
+                Some(prev.price_vnd),
+                Some(prev.available_stock),
+            )
+        }
+    };
+
+    let mut broadcast_msg: Option<String> = None;
+    if notify_customers && settings.partner_shop_notify_changes && plan.is_active && !plan.is_maintenance {
+        if created && plan.available_stock > 0 {
+            let added = parsed.added_qty.max(plan.available_stock);
+            broadcast_msg = Some(messages::restock_broadcast_message(&plan, added));
+        } else if let Some(prev_price) = old_price {
+            if prev_price != plan.price_vnd {
+                let header = if plan.price_vnd < prev_price {
+                    "🔥 <b>GIẢM GIÁ SẢN PHẨM!</b>"
+                } else {
+                    "📢 <b>CẬP NHẬT GIÁ SẢN PHẨM</b>"
+                };
+                broadcast_msg = Some(format!(
+                    "{header}\n\
+                     ━━━━━━━━━━━━━━━━━━━━\n\n\
+                     📦 Sản phẩm: <b>{}</b>\n\
+                     💸 Giá cũ: <s>{}đ</s>\n\
+                     💵 Giá mới: <b>{}đ</b>\n\
+                     📊 Kho hiện tại: <b>{} tài khoản</b>",
+                    escape_html(&plan.name),
+                    format_vnd(prev_price),
+                    format_vnd(plan.price_vnd),
+                    plan.available_stock,
+                ));
+            } else {
+                let prev_stk = old_stock.unwrap_or(0);
+                let added = if parsed.added_qty > 0 {
+                    parsed.added_qty
+                } else {
+                    plan.available_stock - prev_stk
+                };
+                if added > 0 {
+                    broadcast_msg = Some(messages::restock_broadcast_message(&plan, added));
+                }
+            }
+        }
+    }
+
+    let broadcast_triggered = broadcast_msg.is_some();
+    if let Some(bc_text) = broadcast_msg {
+        let state_bg = state.clone();
+        let pid_str = plan.id.to_string();
+        tokio::spawn(async move {
+            let Ok(tg_ids) = user_repo::list_all_active_telegram_ids(&state_bg.pool).await else {
+                return;
+            };
+            let kb = keyboards::restock_broadcast_keyboard(&pid_str);
+            for tg_id in tg_ids {
+                let _ = state_bg
+                    .bot
+                    .send_message(ChatId(tg_id), &bc_text)
+                    .parse_mode(ParseMode::Html)
+                    .reply_markup(kb.clone())
+                    .await;
+                tokio::time::sleep(Duration::from_millis(40)).await;
+            }
+        });
+    }
+
+    if let Some(admin_id) = state.config.admin_telegram_id {
+        let action_tag = if created { "🆕 ĐÃ TẠO SẢN PHẨM MỚI" } else { "🔄 ĐÃ CẬP NHẬT SẢN PHẨM" };
+        let admin_note = format!(
+            "🤖 <b>[AUTO-SYNC] {action_tag}</b>\n\n\
+             • Sản phẩm: <b>{}</b> (<code>{}</code>)\n\
+             • Giá gốc đối tác: <b>{}đ</b> + lời <b>{}đ</b>\n\
+             • Giá bán ra shop: <b>{}đ</b>\n\
+             • Kho hiện tại: <b>{}</b>\n\
+             • Đã báo khách hàng: <b>{}</b>",
+            escape_html(&plan.name),
+            plan.code,
+            format_vnd(parsed.partner_price_vnd),
+            format_vnd(markup_vnd),
+            format_vnd(sell_price_vnd),
+            plan.available_stock,
+            if broadcast_triggered { "Có" } else { "Không" },
+        );
+        let _ = state
+            .bot
+            .send_message(ChatId(admin_id), admin_note)
+            .parse_mode(ParseMode::Html)
+            .await;
+    }
+
+    Ok(IngestAlertOutcome {
+        plan,
+        created,
+        partner_price_vnd: parsed.partner_price_vnd,
+        markup_vnd,
+        sell_price_vnd,
+        old_price_vnd: old_price,
+        old_stock,
+        broadcast_triggered,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_partner_restock_alerts() {
+        let msg1 = "📢 HÀNG MỚI VỪA LÊN KHO\n────────────────────\n\n✨ 500$ API CLAUDE 30D (FW)\n\n📦 Sản phẩm: 500$ API CLAUDE 30D (FW)\n💵 Giá: 199.000đ\n✅ Vừa thêm: 51 tài khoản\n📊 Kho hiện tại: 72 tài khoản";
+        let p1 = parse_partner_bot_alert(msg1).unwrap();
+        assert_eq!(p1.product_name, "500$ API CLAUDE 30D (FW)");
+        assert_eq!(p1.partner_price_vnd, 199_000);
+        assert_eq!(p1.added_qty, 51);
+        assert_eq!(p1.current_stock, 72);
+
+        let msg2 = "📢 HÀNG MỚI VỪA LÊN KHO\n📦 Sản phẩm: 🔥 Netflix - Slot Netflix 4K Private 1M (FW)\n💵 Giá: 75.000đ\n✅ Vừa thêm: 48 tài khoản\n📊 Kho hiện tại: 50 tài khoản";
+        let p2 = parse_partner_bot_alert(msg2).unwrap();
+        assert_eq!(p2.product_name, "🔥 Netflix - Slot Netflix 4K Private 1M (FW)");
+        assert_eq!(p2.partner_price_vnd, 75_000);
+        assert_eq!(p2.added_qty, 48);
+        assert_eq!(p2.current_stock, 50);
+    }
 }

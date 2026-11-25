@@ -1,6 +1,9 @@
 /target
 Cargo.lock
 .env
+scripts/.env
+*.session
+*.session-journal
 *.log
 .DS_Store
 Thumbs.db

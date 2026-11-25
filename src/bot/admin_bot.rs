@@ -13,7 +13,7 @@ use crate::{
     crypto::constant_time_eq_str,
     domain::wallet::format_vnd,
     repo::{activation_repo, plan_repo, settings_repo, user_repo, wallet_repo},
-    services::smm_service,
+    services::{partner_shop_service, smm_service},
     state::{AdminBotPendingAction, SharedState},
 };
 
@@ -226,6 +226,41 @@ async fn handle_message(admin_bot: Bot, msg: Message, state: SharedState) -> Res
     let pending = state.admin_bot_pending.write().await.remove(&telegram_id);
     if let Some(action) = pending {
         handle_pending_input(&admin_bot, chat_id, telegram_id, text, action, &state).await?;
+        return Ok(());
+    }
+
+    // 5. Auto-detect forwarded/pasted partner stock or price alert messages!
+    if partner_shop_service::parse_partner_bot_alert(text).is_some() {
+        match partner_shop_service::ingest_partner_alert_message(&state, text, true).await {
+            Ok(out) => {
+                let tag = if out.created { "🆕 Đã tạo mới" } else { "🔄 Đã cập nhật" };
+                admin_bot
+                    .send_message(
+                        chat_id,
+                        format!(
+                            "✅ <b>{tag} sản phẩm tự động!</b>\n\n\
+                             • Tên: <b>{}</b> (<code>{}</code>)\n\
+                             • Giá gốc: <b>{}đ</b> + lời <b>{}đ</b> = <b>{}đ</b>\n\
+                             • Tồn kho: <b>{}</b>\n\
+                             • Gửi thông báo khách: <b>{}</b>",
+                            escape_html(&out.plan.name),
+                            out.plan.code,
+                            format_vnd(out.partner_price_vnd),
+                            format_vnd(out.markup_vnd),
+                            format_vnd(out.sell_price_vnd),
+                            out.plan.available_stock,
+                            if out.broadcast_triggered { "Có" } else { "Không" },
+                        ),
+                    )
+                    .parse_mode(ParseMode::Html)
+                    .await?;
+            }
+            Err(err) => {
+                admin_bot
+                    .send_message(chat_id, format!("❌ Không thể nhập sản phẩm tự động: {err}"))
+                    .await?;
+            }
+        }
         return Ok(());
     }
 

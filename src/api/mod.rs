@@ -39,6 +39,7 @@ pub fn build_router(state: SharedState) -> Router {
         .route("/partner-shop/products", get(admin::list_partner_shop_products))
         .route("/partner-shop/products/{product_id}", put(admin::update_partner_shop_product))
         .route("/partner-shop/orders", get(admin::list_partner_shop_orders))
+        .route("/partner-shop/ingest-message", post(admin::ingest_partner_message))
         .route_layer(axum_mw::from_fn_with_state(
             state.clone(),
             middleware::require_admin_api_key,
