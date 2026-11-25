@@ -670,7 +670,7 @@ pub async fn purchase_partner_product(
             }
 
             Err(AppError::PaymentGateway(
-                "Sản phẩm vừa tạm hết hàng hoặc hệ thống cung cấp đang bận. Đã tự động hoàn 100% tiền về ví của bạn!".to_string(),
+                "Sản phẩm vừa tạm hết hàng hoặc hệ thống đang bận. Đã tự động hoàn 100% tiền về ví của bạn!".to_string(),
             ))
         }
     }
@@ -690,7 +690,7 @@ pub fn decrypt_order_items(state: &SharedState, order: &PartnerOrder) -> Vec<Str
 fn partner_product_broadcast_kb(product_id: &str) -> InlineKeyboardMarkup {
     InlineKeyboardMarkup::new(vec![vec![
         InlineKeyboardButton::callback("🛒 Mua ngay", format!("pprod:{product_id}")),
-        InlineKeyboardButton::callback("🛍️ Xem cửa hàng", "pshop:list"),
+        InlineKeyboardButton::callback("📋 Xem sản phẩm khác", "back:plans"),
     ]])
 }
 

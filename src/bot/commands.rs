@@ -18,10 +18,10 @@ use crate::{
 pub enum Command {
     #[command(description = "▶️ Xem menu chính")]
     Start(String),
-    #[command(description = "🤖 Kích hoạt Gemini Pro chính chủ")]
-    Pixel,
-    #[command(description = "🛍️ Cửa hàng tài khoản & Key giao tự động")]
+    #[command(description = "🛍️ Xem danh sách sản phẩm")]
     Shop,
+    #[command(description = "🛍️ Danh sách sản phẩm")]
+    Pixel,
     #[command(description = "💳 Nạp tiền tự động qua ngân hàng (VietQR)")]
     Payadd,
     #[command(description = "🎁 Mời bạn bè & xem thống kê tiền thưởng")]
@@ -43,11 +43,8 @@ pub async fn handle_message(bot: Bot, msg: Message, state: SharedState) -> Respo
             Command::Start(start_arg) => {
                 handle_start(&bot, &msg, from, start_arg.trim(), &state).await?;
             }
-            Command::Pixel => {
+            Command::Pixel | Command::Shop => {
                 handle_show_plans(&bot, msg.chat.id, &state).await?;
-            }
-            Command::Shop => {
-                handle_show_partner_shop(&bot, msg.chat.id, &state).await?;
             }
             Command::Payadd => {
                 handle_payadd(&bot, msg.chat.id, telegram_id, &state).await?;
@@ -64,14 +61,9 @@ pub async fn handle_message(bot: Bot, msg: Message, state: SharedState) -> Respo
 
     // Handle Reply Keyboard button taps
     match text {
-        keyboards::BTN_GEMINI_PRO => {
+        keyboards::BTN_PRODUCTS | keyboards::BTN_GEMINI_PRO | keyboards::BTN_PARTNER_SHOP => {
             state.awaiting_deposit_amount.write().await.remove(&telegram_id);
             handle_show_plans(&bot, msg.chat.id, &state).await?;
-            return Ok(());
-        }
-        keyboards::BTN_PARTNER_SHOP => {
-            state.awaiting_deposit_amount.write().await.remove(&telegram_id);
-            handle_show_partner_shop(&bot, msg.chat.id, &state).await?;
             return Ok(());
         }
         keyboards::BTN_WALLET => {
@@ -372,20 +364,23 @@ pub async fn handle_show_plans(
         Ok(p) => p,
         Err(err) => {
             tracing::error!(error = ?err, "Failed to list plans");
-            bot.send_message(chat_id, "⚠️ Không thể tải danh sách gói Gemini Pro.")
+            bot.send_message(chat_id, "⚠️ Không thể tải danh sách sản phẩm lúc này.")
                 .await?;
             return Ok(());
         }
     };
+    let partner_products = partner_repo::list_active_products(&state.pool)
+        .await
+        .unwrap_or_default();
 
-    if plans.is_empty() {
-        bot.send_message(chat_id, "Hiện chưa có gói kích hoạt Gemini Pro nào đang mở bán.")
+    if plans.is_empty() && partner_products.is_empty() {
+        bot.send_message(chat_id, "Hiện chưa có sản phẩm nào đang mở bán.")
             .reply_markup(keyboards::back_to_home_keyboard())
             .await?;
         return Ok(());
     }
 
-    if plans.len() == 1 {
+    if plans.len() == 1 && partner_products.is_empty() {
         let plan = &plans[0];
         let pid = plan.id.to_string();
         let guide_url = state.config.guide_url(Some(&pid));
@@ -401,10 +396,10 @@ pub async fn handle_show_plans(
     } else {
         bot.send_message(
             chat_id,
-            "🤖 <b>Chọn gói kích hoạt Gemini Pro chính chủ (Your Mail) bên dưới:</b>",
+            "🛍️ <b>DANH SÁCH SẢN PHẨM</b>\n👇 Chọn sản phẩm bạn muốn xem chi tiết và đặt mua bên dưới:",
         )
         .parse_mode(ParseMode::Html)
-        .reply_markup(keyboards::plan_selector_keyboard(&plans))
+        .reply_markup(keyboards::unified_products_keyboard(&plans, &partner_products))
         .await?;
     }
 
@@ -416,36 +411,7 @@ pub async fn handle_show_partner_shop(
     chat_id: ChatId,
     state: &SharedState,
 ) -> ResponseResult<()> {
-    let products = match partner_repo::list_active_products(&state.pool).await {
-        Ok(p) => p,
-        Err(err) => {
-            tracing::error!(error = ?err, "Failed to list partner shop products");
-            bot.send_message(chat_id, "⚠️ Không thể tải danh sách sản phẩm lúc này.")
-                .await?;
-            return Ok(());
-        }
-    };
-
-    if products.is_empty() {
-        bot.send_message(
-            chat_id,
-            "🛍️ Hiện cửa hàng tài khoản & Key đang cập nhật kho hàng mới. Vui lòng quay lại sau nhé!",
-        )
-        .reply_markup(keyboards::back_to_home_keyboard())
-        .await?;
-        return Ok(());
-    }
-
-    bot.send_message(
-        chat_id,
-        "🛍️ <b>CỬA HÀNG TÀI KHOẢN &amp; KEY GIAO TỰ ĐỘNG 24/7</b>\n\
-         👇 Chọn sản phẩm bên dưới để xem chi tiết và mua ngay:",
-    )
-    .parse_mode(ParseMode::Html)
-    .reply_markup(keyboards::partner_shop_list_keyboard(&products))
-    .await?;
-
-    Ok(())
+    handle_show_plans(bot, chat_id, state).await
 }
 
 pub async fn handle_payadd(
@@ -518,7 +484,7 @@ async fn handle_my_orders(
 
     let mut lines = Vec::new();
     if !orders.is_empty() {
-        lines.push("📦 <b>Đơn kích hoạt Gemini Pro gần nhất:</b>".to_string());
+        lines.push("📦 <b>Đơn hàng dịch vụ gần nhất:</b>".to_string());
         for o in orders {
             let icon = match o.status.as_str() {
                 "COMPLETED" => "✅",

@@ -7,6 +7,7 @@ use crate::domain::{
     gemini_plan::GeminiPlan, partner_shop::PartnerProduct, wallet::format_vnd,
 };
 
+pub const BTN_PRODUCTS: &str = "🛍️ Sản phẩm";
 pub const BTN_GEMINI_PRO: &str = "🤖 Kích hoạt Gemini Pro";
 pub const BTN_PARTNER_SHOP: &str = "🛍️ Cửa hàng tài khoản & Key";
 pub const BTN_WALLET: &str = "💰 Ví & nạp tiền";
@@ -18,35 +19,59 @@ pub const BTN_REFERRAL: &str = "🎁 Mời bạn bè & thưởng";
 pub fn main_reply_keyboard() -> KeyboardMarkup {
     KeyboardMarkup::new(vec![
         vec![
-            KeyboardButton::new(BTN_GEMINI_PRO),
-            KeyboardButton::new(BTN_PARTNER_SHOP),
-        ],
-        vec![
+            KeyboardButton::new(BTN_PRODUCTS),
             KeyboardButton::new(BTN_ORDERS),
-            KeyboardButton::new(BTN_WALLET),
         ],
         vec![
+            KeyboardButton::new(BTN_WALLET),
             KeyboardButton::new(BTN_GUIDE),
-            KeyboardButton::new(BTN_REFERRAL),
         ],
+        vec![KeyboardButton::new(BTN_REFERRAL)],
     ])
     .resize_keyboard()
     .persistent()
 }
 
-/// Inline keyboard listing active Gemini Pro plans + Back to Home.
-pub fn plan_selector_keyboard(plans: &[GeminiPlan]) -> InlineKeyboardMarkup {
+/// Unified inline keyboard listing ALL store products (both local plans & synced account/key products).
+pub fn unified_products_keyboard(
+    plans: &[GeminiPlan],
+    partner_products: &[PartnerProduct],
+) -> InlineKeyboardMarkup {
     let mut rows: Vec<Vec<InlineKeyboardButton>> = plans
         .iter()
         .map(|p| {
             let label = if p.is_maintenance {
-                format!("🔧 {} (Bảo trì) — {} đ", p.name, format_vnd(p.price_vnd))
+                format!("🔧 {} (Bảo trì) — {}đ", p.name, format_vnd(p.price_vnd))
+            } else if p.available_stock <= 0 {
+                format!("🔹 {} — {}đ (Hết hàng)", p.name, format_vnd(p.price_vnd))
             } else {
-                format!("🔹 {} — {} đ", p.name, format_vnd(p.price_vnd))
+                format!("🔹 {} — {}đ [Còn {}]", p.name, format_vnd(p.price_vnd), p.available_stock)
             };
             vec![InlineKeyboardButton::callback(label, format!("plan:{}", p.id))]
         })
         .collect();
+
+    for p in partner_products {
+        let icon = if p.is_maintenance {
+            "🔧"
+        } else if !p.emoji.is_empty() {
+            p.emoji.as_str()
+        } else {
+            "🔹"
+        };
+        let label = if p.is_maintenance {
+            format!("{icon} {} (Bảo trì) — {}đ", p.name, format_vnd(p.sell_price_vnd))
+        } else if p.stock <= 0 {
+            format!("{icon} {} — {}đ (Hết hàng)", p.name, format_vnd(p.sell_price_vnd))
+        } else {
+            format!("{icon} {} — {}đ [Còn {}]", p.name, format_vnd(p.sell_price_vnd), p.stock)
+        };
+        rows.push(vec![InlineKeyboardButton::callback(
+            label,
+            format!("pprod:{}", p.id),
+        )]);
+    }
+
     rows.push(vec![InlineKeyboardButton::callback(
         "⬅️ Quay lại menu chính",
         "back:home",
@@ -84,7 +109,7 @@ pub fn plan_detail_keyboard(plan_id: &str, guide_url: &str, form_mode: &str) -> 
     }
 
     rows.push(vec![
-        InlineKeyboardButton::callback("⏪ Chọn gói khác", "back:plans"),
+        InlineKeyboardButton::callback("⏪ Chọn sản phẩm khác", "back:plans"),
         InlineKeyboardButton::callback("⬅️ Menu chính", "back:home"),
     ]);
 
@@ -291,7 +316,7 @@ pub fn partner_product_detail_keyboard(product: &PartnerProduct) -> InlineKeyboa
     }
 
     rows.push(vec![
-        InlineKeyboardButton::callback("⏪ Sản phẩm khác", "pshop:list"),
+        InlineKeyboardButton::callback("⏪ Sản phẩm khác", "back:plans"),
         InlineKeyboardButton::callback("⬅️ Menu chính", "back:home"),
     ]);
 

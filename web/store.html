@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gemini Pro Store — Kích hoạt Gemini Pro chính chủ</title>
+  <title>Digital Store — Cửa hàng sản phẩm số &amp; dịch vụ chính chủ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -431,8 +431,8 @@
   <header class="navbar">
     <div class="nav-inner">
       <a class="brand" href="/">
-        <div class="brand-icon"><i class="bx bxs-diamond"></i></div>
-        <span>Gemini Pro Store</span>
+        <div class="brand-icon"><i class="bx bx-shopping-bag"></i></div>
+        <span>Digital Store</span>
       </a>
 
       <nav class="nav-tabs">
@@ -471,8 +471,8 @@
   <main class="container">
     <section class="hero">
       <div>
-        <h1>Kích hoạt Gemini Pro chính chủ ngay trên Website</h1>
-        <p>Mua trực tiếp không cần cài Telegram — nạp tiền tự động bằng mã QR chuyển khoản ngân hàng (VietQR), theo dõi tiến trình kích hoạt trực tuyến và hoàn tiền 100% nếu đơn lỗi.</p>
+        <h1>Mua sản phẩm &amp; dịch vụ số chính chủ ngay trên Website</h1>
+        <p>Đặt mua trực tiếp 24/7 — nạp tiền tự động bằng mã QR chuyển khoản ngân hàng (VietQR), giao hàng &amp; xử lý tự động trực tuyến, hoàn tiền 100% nếu đơn lỗi.</p>
         <div class="hero-badges">
           <span class="hero-badge"><i class="bx bx-shield-quarter"></i> Mã hóa AES-256-GCM</span>
           <span class="hero-badge"><i class="bx bx-qr-scan"></i> VietQR tự động 24/7</span>
@@ -486,16 +486,11 @@
       </div>
     </section>
 
-    <!-- PANE 1: PRODUCTS -->
+    <!-- PANE 1: UNIFIED PRODUCTS -->
     <section id="pane-products" class="pane active">
-      <div class="card-title" style="margin-bottom:12px;"><i class="bx bxs-diamond" style="color:var(--primary);"></i> Kích hoạt Gemini Pro chính chủ</div>
+      <div class="card-title" style="margin-bottom:12px;"><i class="bx bx-store" style="color:var(--primary);"></i> Danh sách sản phẩm</div>
       <div id="plansGrid" class="plans-grid">
-        <div class="card">Đang tải danh sách gói dịch vụ...</div>
-      </div>
-
-      <div id="partnerShopSection" style="display:none;margin-top:28px;">
-        <div class="card-title" style="margin-bottom:12px;"><i class="bx bx-shopping-bag" style="color:var(--ok);"></i> Cửa hàng tài khoản &amp; Key giao tự động 24/7</div>
-        <div id="partnerProductsGrid" class="plans-grid"></div>
+        <div class="card">Đang tải danh sách sản phẩm...</div>
       </div>
     </section>
 
@@ -503,7 +498,7 @@
     <section id="pane-orders" class="pane">
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-          <div class="card-title" style="margin-bottom:0;"><i class="bx bx-receipt"></i> Đơn kích hoạt Gemini Pro của tôi</div>
+          <div class="card-title" style="margin-bottom:0;"><i class="bx bx-receipt"></i> Đơn hàng dịch vụ của tôi</div>
           <button class="btn btn-ghost" onclick="loadMyOrders()"><i class="bx bx-refresh"></i> Làm mới</button>
         </div>
         <div id="ordersContainer" style="color:var(--muted);font-size:0.9rem;">Vui lòng đăng nhập để xem đơn hàng của bạn.</div>
@@ -511,7 +506,7 @@
 
       <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
-          <div class="card-title" style="margin-bottom:0;"><i class="bx bx-key"></i> Đơn tài khoản &amp; Key đã mua</div>
+          <div class="card-title" style="margin-bottom:0;"><i class="bx bx-key"></i> Đơn tài khoản &amp; Key giao ngay</div>
           <button class="btn btn-ghost" onclick="loadMyPartnerOrders()"><i class="bx bx-refresh"></i> Làm mới</button>
         </div>
         <div id="partnerOrdersContainer" style="color:var(--muted);font-size:0.9rem;">Vui lòng đăng nhập để xem đơn tài khoản &amp; key của bạn.</div>
@@ -899,12 +894,12 @@
       }
 
       const grid = document.getElementById("plansGrid");
-      if (!catalogPlans.length) {
-        grid.innerHTML = '<div class="card">Hiện chưa có gói dịch vụ nào đang mở bán.</div>';
+      if (!catalogPlans.length && !catalogPartnerProducts.length) {
+        grid.innerHTML = '<div class="card">Hiện chưa có sản phẩm nào đang mở bán.</div>';
         return;
       }
 
-      grid.innerHTML = catalogPlans.map(p => {
+      const planCards = catalogPlans.map(p => {
         const badge = p.is_maintenance
           ? '<span class="badge badge-warn"><i class="bx bx-wrench"></i> Đang bảo trì</span>'
           : (p.available_stock > 0
@@ -914,7 +909,7 @@
         const btnLabel = p.is_maintenance
           ? '<i class="bx bx-wrench"></i> Đang bảo trì'
           : (p.available_stock > 0
-            ? '<i class="bx bx-bolt-circle"></i> Mua &amp; kích hoạt ngay'
+            ? '<i class="bx bx-cart-add"></i> Mua ngay'
             : '<i class="bx bx-x-circle"></i> Tạm hết hàng');
 
         return `
@@ -926,7 +921,6 @@
               </div>
               <div class="plan-price">${fmtVnd(p.price_vnd)}</div>
               <div class="plan-meta">
-                <span><i class="bx bx-time"></i> ${p.duration_months} tháng</span>
                 <span><i class="bx bx-package"></i> Kho: <strong>${p.available_stock}</strong></span>
                 <span><i class="bx bx-cart-alt"></i> Đã bán: <strong>${p.sold_count}</strong></span>
               </div>
@@ -937,47 +931,42 @@
             </button>
           </div>
         `;
-      }).join("");
+      });
 
-      const psSec = document.getElementById("partnerShopSection");
-      const psGrid = document.getElementById("partnerProductsGrid");
-      if (catalogPartnerProducts.length) {
-        psSec.style.display = "block";
-        psGrid.innerHTML = catalogPartnerProducts.map(p => {
-          const badge = p.is_maintenance
-            ? '<span class="badge badge-warn"><i class="bx bx-wrench"></i> Đang bảo trì</span>'
-            : (p.stock > 0
-              ? `<span class="badge badge-ok"><i class="bx bx-check-circle"></i> Còn ${p.stock}</span>`
-              : '<span class="badge badge-err"><i class="bx bx-x-circle"></i> Hết hàng</span>');
-          const btnLabel = p.is_maintenance
-            ? '<i class="bx bx-wrench"></i> Đang bảo trì'
-            : (p.stock > 0
-              ? '<i class="bx bx-cart-add"></i> Mua giao ngay'
-              : '<i class="bx bx-x-circle"></i> Tạm hết hàng');
-          return `
-            <div class="plan-card">
-              <div>
-                <div class="plan-top">
-                  <div class="plan-name">${esc(p.name)}</div>
-                  ${badge}
-                </div>
-                <div class="plan-price">${fmtVnd(p.sell_price_vnd)}</div>
-                <div class="plan-meta">
-                  ${p.category_name ? `<span><i class="bx bx-folder"></i> ${esc(p.category_name)}</span>` : ''}
-                  <span><i class="bx bx-package"></i> Kho: <strong>${p.stock}</strong></span>
-                  <span><i class="bx bx-cart-alt"></i> Đã bán: <strong>${p.sold_count}</strong></span>
-                </div>
-                <div class="plan-desc">${esc(p.description || "Giao tài khoản / key tự động ngay lập tức sau khi thanh toán.")}</div>
+      const instantCards = catalogPartnerProducts.map(p => {
+        const badge = p.is_maintenance
+          ? '<span class="badge badge-warn"><i class="bx bx-wrench"></i> Đang bảo trì</span>'
+          : (p.stock > 0
+            ? `<span class="badge badge-ok"><i class="bx bx-check-circle"></i> Còn ${p.stock}</span>`
+            : '<span class="badge badge-err"><i class="bx bx-x-circle"></i> Hết hàng</span>');
+        const btnLabel = p.is_maintenance
+          ? '<i class="bx bx-wrench"></i> Đang bảo trì'
+          : (p.stock > 0
+            ? '<i class="bx bx-cart-add"></i> Mua ngay'
+            : '<i class="bx bx-x-circle"></i> Tạm hết hàng');
+        return `
+          <div class="plan-card">
+            <div>
+              <div class="plan-top">
+                <div class="plan-name">${esc(p.name)}</div>
+                ${badge}
               </div>
-              <button class="btn ${p.is_maintenance ? 'btn-ghost' : 'btn-ok'}" style="width:100%;" onclick="clickBuyPartnerProduct('${p.id}')" ${!p.is_maintenance && p.stock <= 0 ? 'disabled' : ''}>
-                ${btnLabel}
-              </button>
+              <div class="plan-price">${fmtVnd(p.sell_price_vnd)}</div>
+              <div class="plan-meta">
+                ${p.category_name ? `<span><i class="bx bx-folder"></i> ${esc(p.category_name)}</span>` : ''}
+                <span><i class="bx bx-package"></i> Kho: <strong>${p.stock}</strong></span>
+                <span><i class="bx bx-cart-alt"></i> Đã bán: <strong>${p.sold_count}</strong></span>
+              </div>
+              <div class="plan-desc">${esc(p.description || "Giao sản phẩm tự động ngay lập tức sau khi thanh toán.")}</div>
             </div>
-          `;
-        }).join("");
-      } else {
-        psSec.style.display = "none";
-      }
+            <button class="btn ${p.is_maintenance ? 'btn-ghost' : 'btn-primary'}" style="width:100%;" onclick="clickBuyPartnerProduct('${p.id}')" ${!p.is_maintenance && p.stock <= 0 ? 'disabled' : ''}>
+              ${btnLabel}
+            </button>
+          </div>
+        `;
+      });
+
+      grid.innerHTML = [...planCards, ...instantCards].join("");
     }
 
     function clickBuyPartnerProduct(productId) {

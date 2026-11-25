@@ -442,7 +442,7 @@ pub async fn handle_callback(
                      • Mã giao dịch: <code>{}</code>\n\
                      • Đã cộng vào ví: <b>+{} đ</b>{}\n\
                      • Số dư hiện tại: <b>{} đ</b>\n\n\
-                     🚀 Bấm /pixel để kích hoạt Gemini Pro ngay bây giờ!",
+                     🚀 Bấm <b>🛍️ Sản phẩm</b> (hoặc /shop) để mua hàng ngay bây giờ!",
                     outcome.order_code,
                     format_vnd(outcome.amount_vnd),
                     bonus_note,

@@ -30,13 +30,13 @@ pub fn welcome_message(
 
     format!(
         "👋 Xin chào <b>{}</b>!\n\n\
-         🤖 Chào mừng bạn đến với hệ thống <b>kích hoạt Gemini Pro chính chủ (Your Mail)</b> tự động.\n\n\
+         🛍️ Chào mừng bạn đến với hệ thống <b>cửa hàng sản phẩm số &amp; dịch vụ nâng cấp chính chủ</b> tự động 24/7.\n\n\
          💰 Số dư ví hiện tại: <b>{} đ</b>\n\
          🎁 <b>Chương trình mời bạn bè:</b>\n\
          <code>{}</code>\n\
          <i>• Bạn nhận ngay <b>{} đ</b> khi bạn bè đăng ký qua link và bắt buộc nạp tiền lần đầu (tối thiểu {} đ).</i>{}\n\n\
          🛟 Hỗ trợ: {}\n\
-         👇 Chọn chức năng bên dưới hoặc gõ /pixel để xem gói kích hoạt Gemini Pro!",
+         👇 Bấm nút <b>🛍️ Sản phẩm</b> bên dưới (hoặc gõ /shop) để xem toàn bộ sản phẩm!",
         escape_html(full_name),
         format_vnd(balance_vnd),
         escape_html(ref_link),

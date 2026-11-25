@@ -159,10 +159,10 @@ pub async fn submit_activation(
     };
 
     let customer_msg = format!(
-        "✅ <b>Đặt đơn kích hoạt Gemini Pro thành công!</b>\n\n\
+        "✅ <b>Đặt đơn hàng thành công!</b>\n\n\
          • Mã đơn: <code>{}</code>\n\
-         • Gói: <b>{}</b>\n\
-         • Gmail: <code>{}</code>\n\
+         • Sản phẩm: <b>{}</b>\n\
+         • Thông tin: <code>{}</code>\n\
          • Đã thanh toán: <b>{} đ</b>\n\
          • Số dư còn lại: <b>{} đ</b>\n\n\
          {}",

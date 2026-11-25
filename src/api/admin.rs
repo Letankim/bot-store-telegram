@@ -768,10 +768,10 @@ pub async fn complete_order(
             .unwrap_or_default();
 
         let msg = format!(
-            "🎉 <b>Đơn kích hoạt Gemini Pro đã hoàn tất!</b>\n\n\
+            "🎉 <b>Đơn hàng của bạn đã hoàn tất!</b>\n\n\
              • Mã đơn: <code>{}</code>\n\
-             • Gmail: <code>{}</code>{}\n\n\
-             ✅ Bạn đã có thể đăng nhập Gemini Pro và sử dụng ngay. Cảm ơn bạn đã ủng hộ!",
+             • Thông tin: <code>{}</code>{}\n\n\
+             ✅ Cảm ơn bạn đã tin tưởng và ủng hộ!",
             outcome.order.order_code,
             escape_html(&outcome.order.gmail_masked),
             note_line
